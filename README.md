@@ -45,16 +45,62 @@ bases que plus personne n'utilise et une base déclarée mais absente du serveur
 
 ### 3. Brancher ton hébergement
 
+Deux voies possibles. Elles donnent le même résultat ; choisis selon ce qui
+t'arrange.
+
+#### A — depuis ta machine, par SSH
+
+`init` accepte directement les paramètres affichés par hPanel › Avancé ›
+Accès SSH :
+
 ```bash
-php bin/hspace init      # crée config/config.php à partir du modèle
-$EDITOR config/config.php
+php bin/hspace init \
+    --host=<ip-ssh> --port=<port> --user=<uXXXXXXXXX> \
+    --key=~/.ssh/id_ed25519 \
+    --mysql-user=<uXXXXXXXXX_inventaire>
+
 php bin/hspace doctor    # vérifie tout et dit quoi corriger
 php bin/hspace scan
 php bin/hspace serve     # http://127.0.0.1:8088
 ```
 
-`config/config.php` est ignoré par git et créé en `0600` : tes identifiants ne
-partiront pas sur GitHub.
+Si tu te connectes par mot de passe plutôt que par clé, renseigne
+`ssh.password` dans le fichier — jamais en argument de ligne de commande, où il
+resterait dans l'historique du shell et dans la liste des processus.
+
+Au premier `doctor`, épingle l'empreinte du serveur affichée dans
+`ssh.host_key_fingerprint` : tes identifiants ne partiront plus ensuite que
+vers ce serveur précis.
+
+#### B — directement sur l'hébergement
+
+Souvent le plus simple quand on a déjà SSH : rien à configurer côté
+authentification, et le scan est bien plus rapide puisqu'il n'y a plus
+d'aller-retour réseau par fichier lu.
+
+```bash
+ssh -p <port> <uXXXXXXXXX>@<ip-ssh>
+git clone <ce-dépôt> ~/hspace && cd ~/hspace
+composer install
+php bin/hspace init --local --mysql-user=<uXXXXXXXXX_inventaire>
+php bin/hspace doctor
+php bin/hspace scan
+```
+
+Si `composer` n'est pas disponible sur ton plan, envoie simplement le dossier
+`vendor/` depuis ta machine : `scp -rP <port> vendor <uXXXXXXXXX>@<ip-ssh>:~/hspace/`.
+
+`scan` affiche déjà l'essentiel dans le terminal, et `orphans`, `sites` et
+`findings` relisent le dernier relevé sans rien rescanner. Pour l'interface
+web, rapatrie l'inventaire — c'est un simple fichier SQLite :
+
+```bash
+scp -P <port> <uXXXXXXXXX>@<ip-ssh>:~/hspace/var/inventory.sqlite ./var/
+php bin/hspace serve
+```
+
+Dans les deux cas, `config/config.php` est ignoré par git et créé en `0600` :
+tes identifiants ne partiront pas sur GitHub.
 
 ---
 
