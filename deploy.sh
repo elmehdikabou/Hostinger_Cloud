@@ -166,6 +166,17 @@ say ''
 dim "Racine du projet : $PROJECT_DIR"
 dim "Racine web attendue : $PROJECT_DIR/public"
 
+# Quand on cree un sous-domaine, Hostinger depose une page d'attente dans le
+# dossier choisi. Un index.html restant a cote de index.php passe avant lui
+# dans l'ordre des pages d'accueil : le serveur continuerait a afficher la
+# page par defaut, et on chercherait longtemps pourquoi.
+for leftover in public/index.html public/index.htm public/default.html; do
+    if [ -f "$leftover" ]; then
+        mv "$leftover" "$leftover.remplace-par-hspace"
+        ok "$(basename "$leftover") de Hostinger mis de cote : il masquait index.php"
+    fi
+done
+
 for guarded in config var; do
     if [ -f "$guarded/.htaccess" ]; then
         ok "$guarded/ protege par son propre .htaccess"
