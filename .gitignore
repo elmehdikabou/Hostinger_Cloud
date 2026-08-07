@@ -4,6 +4,10 @@
 # Donnees locales : base SQLite, exports, logs
 /var/*
 !/var/.gitkeep
+# Le refus d'acces web doit voyager avec le projet : sans lui, la base
+# d'inventaire serait telechargeable quand le projet est depose sous
+# public_html.
+!/var/.htaccess
 
 # Configuration reelle (contient des identifiants) - ne jamais committer
 /config/config.php

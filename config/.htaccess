@@ -1,0 +1,18 @@
+# config/config.php contient le mot de passe SSH et les acces MySQL du compte.
+#
+# Ce fichier de refus est place ici, au plus pres de ce qu'il protege, plutot
+# que de dependre du .htaccess de la racine : quand le projet est depose sous
+# public_html — comme le permet un sous-domaine a dossier personnalise — le
+# dossier devient joignable par le domaine parent, et un seul .htaccess mal
+# place ou non lu suffirait a rendre ces identifiants telechargeables.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+
+Options -Indexes
