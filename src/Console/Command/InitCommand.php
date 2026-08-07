@@ -8,6 +8,7 @@ use HostingerSpace\Config;
 use HostingerSpace\Console\Command;
 use HostingerSpace\Console\Context;
 use HostingerSpace\Console\Output;
+use HostingerSpace\Console\Prompt;
 
 final class InitCommand implements Command
 {
@@ -18,13 +19,23 @@ final class InitCommand implements Command
 
     public function description(): string
     {
-        return 'Cree la configuration (--host, --port, --user, --key, --local)';
+        return 'Cree la configuration, en mode guide par defaut';
     }
 
     public function run(array $arguments, Output $out, Context $context): int
     {
         $target = $context->configPath ?? Config::defaultPath();
         $options = $this->options($arguments);
+        $prompt = new Prompt($out);
+
+        /*
+         * Le mode guide s'active quand personne n'a passe de valeur et qu'on
+         * est bien devant un terminal. Une tache planifiee ou un script ne
+         * doit jamais se retrouver bloque sur une question.
+         */
+        $guided = !isset($options['no-interactive'])
+            && ($options === [] || isset($options['interactive']))
+            && $prompt->isInteractive();
 
         // Avec --config vers un autre dossier, le modele reste celui du
         // projet : sans ce repli, init echouerait des qu'on range sa
@@ -54,6 +65,19 @@ final class InitCommand implements Command
             $out->error("Modele illisible : {$example}");
 
             return 1;
+        }
+
+        if ($guided) {
+            $collected = $this->interview($prompt, $out);
+
+            if ($collected === null) {
+                $out->line();
+                $out->info('Abandonne. Rien n\'a ete ecrit.');
+
+                return 0;
+            }
+
+            $options = $collected;
         }
 
         $source = $this->applyOptions($source, $options, $out);
@@ -119,7 +143,14 @@ final class InitCommand implements Command
 
         $ssh = [];
 
-        foreach (['host' => 'host', 'port' => 'port', 'user' => 'username', 'key' => 'private_key_path'] as $option => $key) {
+        foreach ([
+            'host' => 'host',
+            'port' => 'port',
+            'user' => 'username',
+            'key' => 'private_key_path',
+            'passphrase' => 'private_key_passphrase',
+            'password' => 'password',
+        ] as $option => $key) {
             if (isset($options[$option]) && $options[$option] !== '') {
                 $ssh[$key] = $options[$option];
             }
@@ -129,16 +160,139 @@ final class InitCommand implements Command
             $source = $this->replaceInBlock($source, 'ssh', $ssh);
 
             foreach ($ssh as $key => $value) {
-                $out->success("ssh.{$key} = {$value}");
+                // Un secret est confirme sans etre reaffiche : l'utilisateur
+                // vient de le taper, le lui remontrer ne fait que l'exposer.
+                $out->success("ssh.{$key} = " . ($this->isSecret($key) ? '••••••••' : $value));
             }
         }
 
-        if (isset($options['mysql-user']) && $options['mysql-user'] !== '') {
-            $source = $this->replaceInBlock($source, 'mysql', ['admin_user' => $options['mysql-user']]);
-            $out->success("mysql.admin_user = {$options['mysql-user']}");
+        $mysql = [];
+
+        foreach (['mysql-user' => 'admin_user', 'mysql-password' => 'admin_password'] as $option => $key) {
+            if (isset($options[$option]) && $options[$option] !== '') {
+                $mysql[$key] = $options[$option];
+            }
+        }
+
+        if ($mysql !== []) {
+            $source = $this->replaceInBlock($source, 'mysql', $mysql);
+
+            foreach ($mysql as $key => $value) {
+                $out->success("mysql.{$key} = " . ($this->isSecret($key) ? '••••••••' : $value));
+            }
         }
 
         return $source;
+    }
+
+    private function isSecret(string $key): bool
+    {
+        return str_contains($key, 'password') || str_contains($key, 'passphrase');
+    }
+
+    /**
+     * Questionnaire guide. Retourne null si l'utilisateur renonce.
+     *
+     * @return array<string,string>|null
+     */
+    private function interview(Prompt $prompt, Output $out): ?array
+    {
+        $out->line();
+        $out->line("  Quelques questions, et la configuration sera prete.");
+        $out->dim("  Les valeurs demandees se trouvent dans hPanel. Entree accepte la proposition.");
+
+        $options = [];
+
+        $mode = $prompt->choose('Ou hspace va-t-il tourner ?', [
+            'ssh' => "chez toi — il se connectera a Hostinger en SSH",
+            'local' => "sur l'hebergement lui-meme — il lira le disque en direct",
+        ], 'ssh');
+
+        if ($mode === 'local') {
+            $options['local'] = '1';
+        } else {
+            $out->line();
+            $out->step('Acces SSH');
+            $out->dim("  hPanel > Avance > Acces SSH");
+
+            $options['host'] = (string) $prompt->ask("Adresse IP du serveur SSH :", required: true);
+            $options['port'] = (string) $prompt->ask('Port SSH :', '65002');
+            $options['user'] = (string) $prompt->ask("Identifiant (uXXXXXXXXX) :", required: true);
+
+            $method = $prompt->choose('Comment t\'authentifies-tu ?', [
+                'cle' => "par cle privee — recommande, rien a stocker en clair",
+                'motdepasse' => "par mot de passe",
+            ], 'cle');
+
+            if ($method === 'cle') {
+                $key = $prompt->ask('Chemin de la cle privee :', $this->defaultKeyPath());
+
+                if ($key !== null) {
+                    $options['key'] = $key;
+
+                    if (!is_file(str_replace('~', $this->home(), $key))) {
+                        $out->warn("Aucun fichier a cet emplacement. Corrige-le dans la configuration si besoin.");
+                    }
+
+                    $passphrase = $prompt->askSecret('Phrase de passe de la cle (Entree si aucune) :');
+
+                    if ($passphrase !== null) {
+                        $options['passphrase'] = $passphrase;
+                    }
+                }
+            } else {
+                $password = $prompt->askSecret('Mot de passe SSH (invisible pendant la saisie) :');
+
+                if ($password !== null) {
+                    $options['password'] = $password;
+                }
+            }
+        }
+
+        $out->line();
+        $out->step('Acces MySQL');
+        $out->dim("  hPanel > Bases de donnees MySQL");
+        $out->line();
+        $out->line("  C'est le point qui decide de la fiabilite du resultat. Sur un mutualise,");
+        $out->line("  un utilisateur MySQL ne voit que les bases auxquelles il est rattache — or");
+        $out->line("  une base orpheline est justement une base qu'aucun compte de site ne voit.");
+        $out->line("  Cree un utilisateur rattache a TOUTES tes bases, et indique-le ici.");
+        $out->line();
+
+        $mysqlUser = $prompt->ask("Utilisateur MySQL voyant toutes les bases (Entree pour passer) :");
+
+        if ($mysqlUser !== null) {
+            $options['mysql-user'] = $mysqlUser;
+            $password = $prompt->askSecret('Son mot de passe (invisible pendant la saisie) :');
+
+            if ($password !== null) {
+                $options['mysql-password'] = $password;
+            }
+        } else {
+            $out->warn("Sans cet acces, les orphelines seront presentees comme des pistes, pas des faits.");
+        }
+
+        $out->line();
+
+        return $prompt->confirm('Ecrire la configuration ?') ? $options : null;
+    }
+
+    private function defaultKeyPath(): ?string
+    {
+        foreach (['id_ed25519', 'id_rsa'] as $name) {
+            $path = $this->home() . '/.ssh/' . $name;
+
+            if (is_file($path)) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    private function home(): string
+    {
+        return rtrim((string) (getenv('HOME') ?: getenv('USERPROFILE') ?: ''), '/');
     }
 
     /**
@@ -196,27 +350,53 @@ final class InitCommand implements Command
         return substr($source, 0, $start) . $section . substr($source, $end);
     }
 
-    /** @param array<string,string> $options */
+    /**
+     * Ce qu'il reste a faire — et seulement cela.
+     *
+     * La liste est deduite de ce qui a reellement ete renseigne : apres le
+     * mode guide, reclamer une valeur que l'utilisateur vient de taper ferait
+     * douter que sa saisie ait ete prise en compte.
+     *
+     * @param array<string,string> $options
+     */
     private function nextSteps(Output $out, array $options): void
     {
-        $out->line();
-        $out->line('  Etapes suivantes :');
-        $out->line();
+        $remaining = [];
+        $local = isset($options['local']);
+        $hasAuth = isset($options['key']) || isset($options['password']);
 
-        if (!isset($options['local'])) {
-            $out->line("   1. Renseigne l'authentification SSH dans le fichier :");
-            $out->line("      soit « private_key_path » (recommande), soit « password ».");
-        } else {
-            $out->line('   1. Verifie « paths.domains_dir » si ton arborescence est particuliere.');
+        if ($local) {
+            $remaining[] = ["Verifie « paths.domains_dir » si ton arborescence sort de l'ordinaire."];
+        } elseif (!$hasAuth) {
+            $remaining[] = [
+                "Renseigne l'authentification SSH dans le fichier :",
+                "soit « private_key_path » (recommande), soit « password ».",
+            ];
         }
 
+        if (!isset($options['mysql-user'])) {
+            $remaining[] = [
+                "Cree dans hPanel > Bases de donnees MySQL un utilisateur rattache a TOUTES",
+                "tes bases, et renseigne-le dans « mysql.admin_user ». Sans lui, une base",
+                "qu'aucun site n'utilise risque de rester invisible — or c'est exactement",
+                "ce qu'on cherche.",
+            ];
+        }
+
+        $remaining[] = ['Lance le diagnostic : php bin/hspace doctor'];
+
         $out->line();
-        $out->line('   2. Cree dans hPanel > Bases de donnees MySQL un utilisateur rattache a');
-        $out->line('      TOUTES tes bases, et renseigne-le dans « mysql.admin_user ». Sans lui,');
-        $out->line('      une base qu\'aucun site n\'utilise risque de rester invisible — or');
-        $out->line('      c\'est exactement ce qu\'on cherche.');
+        $out->line(count($remaining) === 1 ? '  Il ne reste plus qu\'a :' : '  Etapes suivantes :');
         $out->line();
-        $out->line('   3. php bin/hspace doctor');
-        $out->line();
+
+        foreach ($remaining as $index => $lines) {
+            foreach ($lines as $position => $line) {
+                $out->line($position === 0
+                    ? '   ' . ($index + 1) . '. ' . $line
+                    : '      ' . $line);
+            }
+
+            $out->line();
+        }
     }
 }

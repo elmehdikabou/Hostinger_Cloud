@@ -50,23 +50,26 @@ t'arrange.
 
 #### A — depuis ta machine, par SSH
 
-`init` accepte directement les paramètres affichés par hPanel › Avancé ›
-Accès SSH :
-
 ```bash
-php bin/hspace init \
-    --host=<ip-ssh> --port=<port> --user=<uXXXXXXXXX> \
-    --key=~/.ssh/id_ed25519 \
-    --mysql-user=<uXXXXXXXXX_inventaire>
-
+php bin/hspace init      # pose les questions une à une
 php bin/hspace doctor    # vérifie tout et dit quoi corriger
 php bin/hspace scan
 php bin/hspace serve     # http://127.0.0.1:8088
 ```
 
-Si tu te connectes par mot de passe plutôt que par clé, renseigne
-`ssh.password` dans le fichier — jamais en argument de ligne de commande, où il
-resterait dans l'historique du shell et dans la liste des processus.
+`init` est guidé par défaut : il demande l'adresse, le port, l'identifiant, la
+méthode d'authentification et l'utilisateur MySQL, puis écrit le fichier.
+Les mots de passe sont saisis **sans écho** — ils n'apparaissent ni à l'écran,
+ni dans l'historique du shell, ni dans la liste des processus, contrairement à
+un `--password=…` que n'importe quel autre compte de la machine pourrait lire.
+
+Les valeurs demandées se trouvent dans hPanel › Avancé › Accès SSH (adresse,
+port, identifiant `uXXXXXXXXX`) et hPanel › Bases de données MySQL.
+
+Pour scripter l'installation, les mêmes valeurs passent en options —
+`--host=`, `--port=`, `--user=`, `--key=`, `--mysql-user=`, `--local`,
+`--no-interactive`. Évite `--password=` sur une machine partagée, pour la
+raison ci-dessus.
 
 Au premier `doctor`, épingle l'empreinte du serveur affichée dans
 `ssh.host_key_fingerprint` : tes identifiants ne partiront plus ensuite que
@@ -82,7 +85,7 @@ d'aller-retour réseau par fichier lu.
 ssh -p <port> <uXXXXXXXXX>@<ip-ssh>
 git clone <ce-dépôt> ~/hspace && cd ~/hspace
 composer install
-php bin/hspace init --local --mysql-user=<uXXXXXXXXX_inventaire>
+php bin/hspace init --local     # puis les questions MySQL
 php bin/hspace doctor
 php bin/hspace scan
 ```

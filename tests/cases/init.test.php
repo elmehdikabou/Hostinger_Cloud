@@ -18,13 +18,15 @@ mkdir($directory, 0o775, true);
  */
 $init = static function (array $arguments) use ($directory): array {
     $target = $directory . '/config-' . bin2hex(random_bytes(4)) . '.php';
-    $silent = fopen('php://memory', 'w+');
+    $stream = fopen('php://memory', 'w+');
 
-    (new InitCommand())->run($arguments, new Output($silent), new Context($target));
+    (new InitCommand())->run($arguments, new Output($stream), new Context($target));
 
-    fclose($silent);
+    rewind($stream);
+    $shown = (string) stream_get_contents($stream);
+    fclose($stream);
 
-    return ['path' => $target, 'values' => require $target];
+    return ['path' => $target, 'values' => require $target, 'shown' => $shown];
 };
 
 test('Les options remplissent la section SSH', function () use ($init): void {
@@ -66,11 +68,50 @@ test('--local bascule le mode sans exiger de SSH', function () use ($init): void
 });
 
 test('Sans option, le modele est copie tel quel', function () use ($init): void {
-    $result = $init([]);
+    // --no-interactive : sans lui, la commande poserait ses questions et le
+    // test resterait bloque sur la premiere.
+    $result = $init(['--no-interactive']);
 
     assertSame('ssh', $result['values']['mode']);
     assertSame(65002, $result['values']['ssh']['port']);
     assertNull($result['values']['mysql']['admin_user']);
+});
+
+test('Les secrets sont ecrits mais jamais reaffiches', function () use ($init): void {
+    $result = $init(['--password=SecretSSH', '--mysql-user=u1_inv', '--mysql-password=SecretMySQL']);
+
+    assertSame('SecretSSH', $result['values']['ssh']['password']);
+    assertSame('SecretMySQL', $result['values']['mysql']['admin_password']);
+    assertFalse(str_contains($result['shown'], 'SecretSSH'), 'le mot de passe SSH ne doit pas etre reaffiche');
+    assertFalse(str_contains($result['shown'], 'SecretMySQL'), 'le mot de passe MySQL non plus');
+    assertContains('u1_inv', $result['shown'], "l'utilisateur, lui, peut etre confirme");
+});
+
+test('Les etapes restantes ne reclament pas ce qui vient d etre renseigne', function () use ($init): void {
+    // Apres une configuration complete, redemander l'authentification ferait
+    // douter que la saisie ait ete prise en compte.
+    $complete = $init(['--host=1.2.3.4', '--user=u1', '--key=/tmp/k', '--mysql-user=u1_inv']);
+
+    // On vise la consigne, pas la cle : « mysql.admin_user » figure aussi
+    // dans la ligne qui confirme la valeur ecrite.
+    $consigne = 'Cree dans hPanel';
+
+    assertContains('doctor', $complete['shown']);
+    assertFalse(str_contains($complete['shown'], "Renseigne l'authentification SSH"));
+    assertFalse(str_contains($complete['shown'], $consigne));
+    assertContains("Il ne reste plus qu", $complete['shown']);
+
+    $partiel = $init(['--host=1.2.3.4', '--user=u1']);
+
+    assertContains("Renseigne l'authentification SSH", $partiel['shown']);
+    assertContains($consigne, $partiel['shown']);
+});
+
+test('En mode local, aucune authentification SSH n est reclamee', function () use ($init): void {
+    $result = $init(['--local', '--mysql-user=u1_inv']);
+
+    assertFalse(str_contains($result['shown'], "Renseigne l'authentification SSH"));
+    assertContains('paths.domains_dir', $result['shown']);
 });
 
 test('La configuration est creee en 0600', function () use ($init): void {

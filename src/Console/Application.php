@@ -140,7 +140,7 @@ final class Application
         $out->dim('    --demo              Lit les donnees de demonstration au lieu des tiennes');
         $out->dim('    --verbose           Affiche la trace complete en cas d\'erreur');
         $out->line();
-        $out->dim('  Pour demarrer : php bin/hspace init, puis php bin/hspace doctor');
+        $out->dim('  Pour demarrer : php bin/hspace init (guide), puis php bin/hspace doctor');
         $out->line();
     }
 }
