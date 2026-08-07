@@ -135,7 +135,7 @@ qu'une base invisible n'est pas une base absente.
 
 | Commande | Rôle |
 |---|---|
-| `init` | Crée la configuration à partir du modèle |
+| `init` | Crée la configuration, en mode guidé (questions une à une) |
 | `doctor` | Vérifie configuration, connexion, arborescence et accès MySQL |
 | `scan` | Lance un relevé complet et l'enregistre |
 | `sites` | Liste les sites et leurs bases |
@@ -147,6 +147,9 @@ qu'une base invisible n'est pas une base absente.
 | `demo` | Compte fictif et relevés de démonstration |
 
 Options communes : `--config=<chemin>`, `--demo`, `--verbose`.
+
+Options de `init` : `--host=`, `--port=`, `--user=`, `--key=`, `--mysql-user=`,
+`--local`, `--no-interactive`.
 
 ---
 
