@@ -1,0 +1,25 @@
+# Regles pour le dossier public, seul dossier a exposer au serveur web.
+# Hostinger utilise LiteSpeed, qui lit ce fichier comme le ferait Apache.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Les fichiers reellement presents (CSS, favicon) sont servis directement.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Tout le reste passe par le controleur frontal.
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "no-referrer"
+    # L'inventaire d'un hebergement n'a rien a faire dans un index public.
+    Header always set X-Robots-Tag "noindex, nofollow, noarchive"
+</IfModule>
+
+# Pas de listage de dossier si l'index venait a manquer.
+Options -Indexes

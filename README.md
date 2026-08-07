@@ -107,6 +107,85 @@ tes identifiants ne partiront pas sur GitHub.
 
 ---
 
+## Héberger l'interface sur un sous-domaine
+
+Pour consulter l'inventaire depuis n'importe où, sans lancer de serveur local.
+
+### Avant tout : cette interface doit être protégée
+
+Elle publie les noms de tes bases, tes utilisateurs MySQL, les chemins sur le
+disque et les faiblesses repérées sur chaque site. Publiée telle quelle, c'est
+un mode d'emploi pour attaquer ton hébergement.
+
+hspace refuse donc de fonctionner sans mot de passe dès que la requête vient
+d'ailleurs que de `127.0.0.1` : au lieu des données, il affiche la marche à
+suivre pour le définir. Ce n'est pas un avertissement qu'on peut ignorer — rien
+ne s'affiche tant que la protection n'est pas en place.
+
+### Les étapes
+
+**1. Créer le sous-domaine.** hPanel › Domaines › Sous-domaines. Crée par
+exemple `inventaire.tondomaine.fr`, et surtout : donne comme **dossier
+personnalisé** `hspace/public`, pas `hspace`.
+
+C'est le point à ne pas rater. Si la racine web pointe sur `hspace/`, alors
+`config/config.php` — qui contient ton mot de passe SSH et tes accès MySQL —
+devient téléchargeable. Un `.htaccess` à la racine du projet bloque ce cas par
+sécurité, mais mieux vaut ne pas dépendre de lui.
+
+**2. Vérifier la version de PHP.** hPanel › Avancé › Configuration PHP : il
+faut **8.2 ou plus**, avec `pdo_sqlite` activé.
+
+**3. Déposer le projet.**
+
+```bash
+ssh -p <port> <uXXXXXXXXX>@<ip-ssh>
+git clone -b <branche> <ce-dépôt> ~/hspace && cd ~/hspace
+composer install --no-dev
+```
+
+**4. Configurer et protéger.**
+
+```bash
+php bin/hspace init --local   # mode local : l'app lit le disque en direct
+php bin/hspace passwd         # obligatoire — saisie masquée
+php bin/hspace doctor
+php bin/hspace scan
+```
+
+`passwd` ne stocke que le condensé bcrypt du mot de passe. Choisis-le long : il
+n'a pas à être mémorisable, un gestionnaire de mots de passe suffit.
+
+**5. Ouvrir `https://inventaire.tondomaine.fr`.** La page de connexion
+apparaît. Après identification, l'interface complète.
+
+### Rafraîchir l'inventaire tout seul
+
+hPanel › Avancé › Tâches Cron, une fois par semaine :
+
+```
+0 5 * * 1 cd ~/hspace && /usr/bin/php bin/hspace scan >> var/scan.log 2>&1
+```
+
+L'interface montrera le nouveau relevé, et `Historique` dira ce qui a changé.
+
+### Ce qui protège quoi
+
+| | |
+|---|---|
+| Racine web sur `public/` | Le code, la configuration et la base d'inventaire sont hors d'atteinte du web |
+| `.htaccess` racine | Filet si la racine web est mal pointée : refuse `config/`, `var/`, `src/`… |
+| Mot de passe obligatoire | Rien ne s'affiche depuis l'extérieur sans identification |
+| Condensé bcrypt | Même en lisant la configuration, on ne retrouve pas le mot de passe |
+| Jeton anti-rejeu | Le formulaire de connexion ne peut pas être soumis depuis un autre site |
+| Blocage après 5 essais | Une minute d'attente, en plus de la lenteur propre à bcrypt |
+| `X-Robots-Tag: noindex` | L'inventaire ne se retrouve pas dans un moteur de recherche |
+
+Depuis `127.0.0.1`, aucun mot de passe n'est demandé : `hspace serve` sur ton
+poste s'adresse déjà à son propriétaire.
+
+---
+
 ## Ce qu'il faut préparer dans hPanel
 
 **Accès SSH** — hPanel › Avancé › Accès SSH. Note l'IP, le port (rarement 22
@@ -144,6 +223,7 @@ qu'une base invisible n'est pas une base absente.
 | `history` | Relevés enregistrés |
 | `diff <a> <b>` | Compare deux relevés |
 | `serve` | Interface web |
+| `passwd` | Définit le mot de passe de l'interface web |
 | `demo` | Compte fictif et relevés de démonstration |
 
 Options communes : `--config=<chemin>`, `--demo`, `--verbose`.

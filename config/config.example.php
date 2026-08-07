@@ -146,5 +146,17 @@ return [
     'web' => [
         'host' => '127.0.0.1',
         'port' => 8088,
+
+        /*
+        | Mot de passe de l'interface, sous forme de condense.
+        |
+        | Obligatoire des que l'interface est atteignable autrement que depuis
+        | 127.0.0.1 : elle publie les noms de tes bases, tes utilisateurs
+        | MySQL, les chemins sur le disque et les faiblesses reperees. Sans
+        | condense ici, une requete venue de l'exterieur n'affiche rien.
+        |
+        | A definir avec : php bin/hspace passwd
+        */
+        'password_hash' => null,
     ],
 ];

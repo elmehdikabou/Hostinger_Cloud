@@ -1,0 +1,28 @@
+# Filet de securite : ce fichier ne s'applique que si la racine web a ete
+# pointee sur le dossier du projet au lieu de son sous-dossier « public ».
+#
+# C'est une erreur de configuration facile a commettre, et couteuse : sans ces
+# regles, config/config.php — qui contient le mot de passe SSH et les acces
+# MySQL — serait telechargeable par n'importe qui.
+#
+# La bonne configuration reste de pointer le sous-domaine sur .../public.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Rien de ce qui est en dehors de « public » ne sort.
+    RewriteRule ^(config|var|src|templates|tests|bin|vendor)(/|$) - [F,L]
+    RewriteRule ^(composer\.(json|lock)|README\.md|\.htaccess)$ - [F,L]
+
+    # Le reste est servi depuis public, pour que l'outil fonctionne quand meme.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Repli quand la reecriture n'est pas disponible : on refuse plutot que
+# d'exposer. Mieux vaut une interface hors service qu'une configuration lisible.
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
+
+Options -Indexes

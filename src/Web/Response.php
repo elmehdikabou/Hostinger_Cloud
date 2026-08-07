@@ -14,6 +14,20 @@ final readonly class Response
     ) {
     }
 
+    /**
+     * Redirection interne.
+     *
+     * L'adresse n'est jamais construite a partir de la requete : une
+     * redirection ouverte permettrait d'envoyer quelqu'un ailleurs depuis un
+     * lien qui semble pointer vers l'inventaire.
+     */
+    public static function redirect(string $path): self
+    {
+        $path = '/' . ltrim(parse_url($path, PHP_URL_PATH) ?: '', '/');
+
+        return new self('', 302, ['Location' => $path]);
+    }
+
     public function send(): void
     {
         http_response_code($this->status);

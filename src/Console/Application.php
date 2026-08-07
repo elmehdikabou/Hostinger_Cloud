@@ -11,6 +11,7 @@ use HostingerSpace\Console\Command\FindingsCommand;
 use HostingerSpace\Console\Command\HistoryCommand;
 use HostingerSpace\Console\Command\InitCommand;
 use HostingerSpace\Console\Command\OrphansCommand;
+use HostingerSpace\Console\Command\PasswordCommand;
 use HostingerSpace\Console\Command\ScanCommand;
 use HostingerSpace\Console\Command\ServeCommand;
 use HostingerSpace\Console\Command\SitesCommand;
@@ -34,6 +35,7 @@ final class Application
             new HistoryCommand(),
             new DiffCommand(),
             new ServeCommand(),
+            new PasswordCommand(),
             new DemoCommand(),
         ] as $command) {
             $this->commands[$command->name()] = $command;

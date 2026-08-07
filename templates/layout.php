@@ -72,6 +72,13 @@ $navigation = [
                 <button type="submit">Voir</button>
             </form>
         <?php endif ?>
+
+        <?php if ($protected ?? false) : ?>
+            <div class="nav-group">Session</div>
+            <nav class="nav">
+                <a href="/logout">Se déconnecter</a>
+            </nav>
+        <?php endif ?>
       </div>
     </aside>
 

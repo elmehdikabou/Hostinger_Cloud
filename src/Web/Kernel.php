@@ -21,21 +21,37 @@ final class Kernel
     private readonly ScanRepository $repository;
     private readonly View $view;
 
+    private readonly Auth $auth;
+
     public function __construct(
         private readonly Database $database,
         string $templateDirectory,
         private readonly bool $demo = false,
+        ?Auth $auth = null,
     ) {
         $this->repository = new ScanRepository($this->database);
-        $this->view = new View($templateDirectory, ['demo' => $this->demo]);
+        // Sans controle d'acces explicite, on se place dans le cas du poste
+        // local : c'est « hspace serve » chez soi.
+        $this->auth = $auth ?? new Auth(null, localClient: true);
+        $this->view = new View($templateDirectory, [
+            'demo' => $this->demo,
+            'protected' => $this->auth->configured(),
+        ]);
     }
 
     /**
      * @param array<string,string> $query
+     * @param array<string,string> $post
      */
-    public function handle(string $path, array $query): Response
+    public function handle(string $path, array $query, array $post = [], string $method = 'GET'): Response
     {
         $path = '/' . trim(parse_url($path, PHP_URL_PATH) ?: '/', '/');
+
+        $gate = $this->guard($path, $post, $method);
+
+        if ($gate !== null) {
+            return $gate;
+        }
 
         $scans = $this->repository->scans(60);
 
@@ -91,6 +107,55 @@ final class Kernel
                 'message' => "L'adresse « {$path} » ne correspond à aucune page.",
             ])), 404),
         };
+    }
+
+    /**
+     * Filtre d'acces, applique avant toute lecture de l'inventaire.
+     *
+     * Retourne null quand la requete peut continuer, une reponse sinon. Rien
+     * de ce que contient la base n'est lu tant que ce filtre n'a pas donne
+     * son accord : une page d'erreur ne doit pas laisser filtrer le nombre de
+     * sites ou la date du dernier releve.
+     *
+     * @param array<string,string> $post
+     */
+    private function guard(string $path, array $post, string $method): ?Response
+    {
+        if ($path === '/logout') {
+            $this->auth->logout();
+
+            return Response::redirect('/');
+        }
+
+        if ($this->auth->allowed()) {
+            // Deja identifie : le formulaire n'a plus lieu d'etre.
+            return $path === '/login' ? Response::redirect('/') : null;
+        }
+
+        if ($this->auth->needsSetup()) {
+            return new Response($this->view->partial('setup'), 403);
+        }
+
+        $error = null;
+
+        if ($path === '/login' && $method === 'POST') {
+            $locked = $this->auth->lockedFor();
+
+            if ($locked > 0) {
+                $error = "Trop de tentatives. Reessaie dans {$locked} secondes.";
+            } elseif (!$this->auth->csrfValid($post['jeton'] ?? null)) {
+                $error = "Formulaire expire. Recharge la page et reessaie.";
+            } elseif ($this->auth->attempt((string) ($post['motdepasse'] ?? ''))) {
+                return Response::redirect('/');
+            } else {
+                $error = "Mot de passe incorrect.";
+            }
+        }
+
+        return new Response(
+            $this->view->partial('login', ['error' => $error, 'jeton' => $this->auth->csrfToken()]),
+            $error !== null ? 401 : 200,
+        );
     }
 
     /**
