@@ -11,7 +11,7 @@ use HostingerSpace\Model\Site;
 use HostingerSpace\Mysql\DatabaseInfo;
 use HostingerSpace\Mysql\DatabaseInventory;
 use HostingerSpace\Scanner\SiteScanner;
-use HostingerSpace\Tests\FakeAccount;
+use HostingerSpace\Demo\FakeAccount;
 use HostingerSpace\Transport\LocalTransport;
 
 $account = FakeAccount::create();

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use HostingerSpace\Detector\DetectorRegistry;
 use HostingerSpace\Detector\SiteContext;
-use HostingerSpace\Tests\FakeAccount;
+use HostingerSpace\Demo\FakeAccount;
 use HostingerSpace\Transport\LocalTransport;
 
 $account = FakeAccount::create();

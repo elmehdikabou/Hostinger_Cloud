@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
-namespace HostingerSpace\Tests;
+namespace HostingerSpace\Demo;
+
+use HostingerSpace\Mysql\CredentialProbe;
+use HostingerSpace\Mysql\DatabaseInfo;
+use HostingerSpace\Mysql\DatabaseInventory;
 
 /**
  * Construit sur disque une arborescence ressemblant a un compte Hostinger.
@@ -166,6 +170,33 @@ final class FakeAccount
         ];
         // Note : u998877_api est reference par le Laravel mais absent d'ici,
         // ce qui doit produire un constat « base manquante ».
+    }
+
+    /**
+     * L'inventaire MySQL correspondant, tel que le renverrait un vrai serveur.
+     */
+    public static function inventory(): DatabaseInventory
+    {
+        $databases = [];
+
+        foreach (self::databases() as $name => $meta) {
+            $info = new DatabaseInfo($name);
+            $info->tableCount = $meta['tables'];
+            $info->sizeBytes = $meta['size'];
+            $info->rowEstimate = $meta['tables'] * 420;
+            $info->charset = 'utf8mb4';
+            $info->collation = 'utf8mb4_unicode_ci';
+            $info->updatedAt = $meta['updated'] === null ? null : (strtotime($meta['updated']) ?: null);
+            $info->addSource('u998877_demo@localhost (acces global)');
+
+            $databases[$name] = $info;
+        }
+
+        return new DatabaseInventory(
+            $databases,
+            [new CredentialProbe('u998877_demo@localhost (acces global)', 'config', true, count($databases), null, true)],
+            true,
+        );
     }
 
     private function file(string $relative, string $contents): void

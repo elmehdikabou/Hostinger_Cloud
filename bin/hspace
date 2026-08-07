@@ -1,0 +1,33 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "hspace s'utilise en ligne de commande.\n");
+    exit(1);
+}
+
+if (PHP_VERSION_ID < 80200) {
+    fwrite(STDERR, "PHP 8.2 ou plus recent est requis (version detectee : " . PHP_VERSION . ").\n");
+    exit(1);
+}
+
+$autoload = null;
+
+foreach ([__DIR__ . '/../vendor/autoload.php', __DIR__ . '/../../../autoload.php'] as $candidate) {
+    if (is_file($candidate)) {
+        $autoload = $candidate;
+
+        break;
+    }
+}
+
+if ($autoload === null) {
+    fwrite(STDERR, "Dependances absentes. Lance : composer install\n");
+    exit(1);
+}
+
+require $autoload;
+
+exit((new HostingerSpace\Console\Application())->run($argv));

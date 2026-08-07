@@ -11,7 +11,7 @@ use HostingerSpace\Scanner\SiteScanner;
 use HostingerSpace\Storage\Database;
 use HostingerSpace\Storage\ScanComparer;
 use HostingerSpace\Storage\ScanRepository;
-use HostingerSpace\Tests\FakeAccount;
+use HostingerSpace\Demo\FakeAccount;
 use HostingerSpace\Transport\LocalTransport;
 
 $account = FakeAccount::create();
