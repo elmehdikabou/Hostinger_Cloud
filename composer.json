@@ -1,0 +1,29 @@
+{
+    "name": "elmehdikabou/hostinger-space-manager",
+    "description": "Inventaire et cartographie d'un espace d'hebergement Hostinger : sites, bases de donnees, liens, orphelines.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "phpseclib/phpseclib": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "HostingerSpace\\": "src/"
+        }
+    },
+    "bin": [
+        "bin/hspace"
+    ],
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "scan": "php bin/hspace scan",
+        "serve": "php bin/hspace serve"
+    }
+}

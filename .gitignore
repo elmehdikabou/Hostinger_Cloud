@@ -1,0 +1,17 @@
+# Dependances
+/vendor/
+
+# Donnees locales : base SQLite, exports, logs
+/var/*
+!/var/.gitkeep
+
+# Configuration reelle (contient des identifiants) - ne jamais committer
+/config/config.php
+/config/*.local.php
+.env
+
+# Divers
+.DS_Store
+*.log
+.idea/
+.vscode/
