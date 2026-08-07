@@ -62,6 +62,12 @@ final class SiteScanner
         $roots = $this->documentRoots($home);
         $sites = [];
 
+        // On invoque la fonction de suivi telle quelle. Closure::call() la
+        // rebinderait sur ce scanner, ce qui casserait toute fonction ayant
+        // son propre $this — c'est le cas de celle passee par ScanRunner.
+        $notify = $progress === null ? static function (string $name): void {
+        } : $progress(...);
+
         foreach ($roots as $path => $domain) {
             $site = $this->inspect($path, $domain, $home, null, '/');
 
@@ -70,11 +76,11 @@ final class SiteScanner
             }
 
             $sites[] = $site;
-            $progress?->call($this, $site->displayName());
+            $notify($site->displayName());
 
             foreach ($this->nested($path, $domain, $home, $site->key, 1) as $child) {
                 $sites[] = $child;
-                $progress?->call($this, $child->displayName());
+                $notify($child->displayName());
             }
         }
 
