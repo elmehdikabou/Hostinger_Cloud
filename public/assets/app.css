@@ -181,6 +181,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
 .grid-kpi { grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); }
 
+/*
+ * Un enfant de grille ou de flexbox garde min-width: auto et se laisse
+ * elargir par son contenu : un tableau large deborderait alors sa colonne, et
+ * la page entiere defilerait lateralement au lieu du seul tableau.
+ */
+.grid > *, .table-wrap, .actions, .actions li { min-width: 0; }
+
 .kpi { display: block; color: inherit; }
 .kpi:hover { text-decoration: none; border-color: var(--border-strong); }
 .kpi .value { font-size: 30px; font-weight: 650; letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums; }
