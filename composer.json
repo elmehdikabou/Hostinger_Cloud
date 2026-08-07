@@ -16,6 +16,11 @@
             "HostingerSpace\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "HostingerSpace\\Tests\\": "tests/"
+        }
+    },
     "bin": [
         "bin/hspace"
     ],
