@@ -44,22 +44,10 @@ final class Application
     public function run(array $argv): int
     {
         $out = new Output();
-        $arguments = array_slice($argv, 1);
-        $configPath = null;
 
-        // --config=chemin peut apparaitre n'importe ou dans la ligne.
-        foreach ($arguments as $index => $argument) {
-            if (str_starts_with($argument, '--config=')) {
-                $configPath = substr($argument, 9);
-                unset($arguments[$index]);
-            }
-        }
+        ['arguments' => $arguments, 'config' => $configPath, 'demo' => $demo, 'verbose' => $verbose]
+            = self::parseGlobalOptions(array_slice($argv, 1));
 
-        // --demo bascule toutes les commandes de lecture sur la base fictive,
-        // pour explorer l'outil avant d'avoir branche un hebergement.
-        $demo = in_array('--demo', $arguments, true);
-
-        $arguments = array_values($arguments);
         $name = $arguments[0] ?? 'help';
 
         if (in_array($name, ['help', '--help', '-h', ''], true)) {
@@ -89,13 +77,47 @@ final class Application
             $out->line();
             $out->error($e->getMessage());
 
-            if (in_array('-v', $arguments, true) || in_array('--verbose', $arguments, true)) {
+            if ($verbose) {
                 $out->line();
                 $out->dim($e->getTraceAsString());
             }
 
             return 1;
         }
+    }
+
+    /**
+     * Separe les options communes des arguments destines a la commande.
+     *
+     * Les options communes doivent disparaitre de la ligne avant d'atteindre
+     * la commande. Sans cela, « hspace diff --demo 1 3 » verrait « --demo »
+     * comme premier argument positionnel et tenterait de comparer le scan
+     * numero 0 — la commande repondait « il faut au moins deux scans » alors
+     * que les deux numeros etaient bien la.
+     *
+     * @param array<int,string> $argv Arguments, sans le nom du programme.
+     *
+     * @return array{arguments:array<int,string>,config:?string,demo:bool,verbose:bool}
+     */
+    public static function parseGlobalOptions(array $argv): array
+    {
+        $arguments = [];
+        $config = null;
+        $demo = false;
+        $verbose = false;
+
+        foreach ($argv as $argument) {
+            match (true) {
+                str_starts_with($argument, '--config=') => $config = substr($argument, 9),
+                // Bascule les commandes de lecture sur la base fictive, pour
+                // explorer l'outil avant d'avoir branche un hebergement.
+                $argument === '--demo' => $demo = true,
+                $argument === '--verbose', $argument === '-v' => $verbose = true,
+                default => $arguments[] = $argument,
+            };
+        }
+
+        return ['arguments' => $arguments, 'config' => $config, 'demo' => $demo, 'verbose' => $verbose];
     }
 
     private function usage(Output $out): void
