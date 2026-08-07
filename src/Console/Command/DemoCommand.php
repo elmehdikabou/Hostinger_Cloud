@@ -65,25 +65,45 @@ final class DemoCommand implements Command
         // d'abandon soient visibles dans la demonstration.
         $this->ageFiles($sites);
 
-        $inventory = FakeAccount::inventory();
-        $analysis = (new Linker(180))->analyse($sites, $inventory);
-
-        $result = new ScanResult(
-            startedAt: time() - 42,
-            finishedAt: time(),
-            host: 'demonstration (compte fictif)',
-            mode: 'local',
-            sites: $sites,
-            inventory: $inventory,
-            analysis: $analysis,
-            errors: [],
-        );
-
         $databasePath = $context->rootDir() . '/var/demo.sqlite';
-        $repository = new ScanRepository(new Database($databasePath));
-        $scanId = $repository->save($result);
+        @unlink($databasePath);
 
-        $out->success("Scan de demonstration #{$scanId} enregistre.");
+        $repository = new ScanRepository(new Database($databasePath));
+
+        // Trois releves espaces dans le temps plutot qu'un seul : sans
+        // historique, les pages Historique et Comparaison n'auraient rien a
+        // montrer, alors que c'est la moitie de l'interet de l'outil.
+        $moments = [
+            ['days' => 62, 'drop' => ['u998877_test'], 'add' => []],
+            ['days' => 29, 'drop' => [], 'add' => []],
+            ['days' => 0, 'drop' => ['u998877_ancienne'], 'add' => ['u998877_export_2026' => 5_242_880]],
+        ];
+
+        $scanId = 0;
+        $analysis = null;
+        $inventory = FakeAccount::inventory();
+
+        foreach ($moments as $moment) {
+            $inventory = $this->inventoryAt($moment['drop'], $moment['add']);
+            $analysis = (new Linker(180))->analyse($sites, $inventory);
+            $finishedAt = time() - ($moment['days'] * 86_400);
+
+            $scanId = $repository->save(new ScanResult(
+                startedAt: $finishedAt - 42,
+                finishedAt: $finishedAt,
+                host: 'demonstration (compte fictif)',
+                mode: 'local',
+                sites: $sites,
+                inventory: $inventory,
+                analysis: $analysis,
+                errors: [],
+            ));
+
+            $out->info("Releve #{$scanId} — " . count($inventory->databases) . ' bases, '
+                . count($analysis->orphans) . ' orpheline(s)');
+        }
+
+        $out->success(count($moments) . " releves de demonstration enregistres.");
         $out->line();
         $out->pairs([
             'Sites' => (string) count($sites),
@@ -100,6 +120,36 @@ final class DemoCommand implements Command
         $out->line();
 
         return 0;
+    }
+
+    /**
+     * Etat des bases a un instant donne du scenario.
+     *
+     * @param array<int,string>    $drop Bases pas encore creees, ou deja supprimees.
+     * @param array<string,int>    $add  Bases apparues depuis, avec leur taille.
+     */
+    private function inventoryAt(array $drop, array $add): \HostingerSpace\Mysql\DatabaseInventory
+    {
+        $base = FakeAccount::inventory();
+        $databases = $base->databases;
+
+        foreach ($drop as $name) {
+            unset($databases[$name]);
+        }
+
+        foreach ($add as $name => $size) {
+            $info = new \HostingerSpace\Mysql\DatabaseInfo($name);
+            $info->tableCount = 3;
+            $info->sizeBytes = $size;
+            $info->updatedAt = time() - 86_400;
+            $info->charset = 'utf8mb4';
+            $info->addSource('u998877_demo@localhost (acces global)');
+            $databases[$name] = $info;
+        }
+
+        ksort($databases, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return new \HostingerSpace\Mysql\DatabaseInventory($databases, $base->probes, true);
     }
 
     /** @param array<int,\HostingerSpace\Model\Site> $sites */
