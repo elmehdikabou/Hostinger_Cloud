@@ -11,6 +11,7 @@
 
 # Configuration reelle (contient des identifiants) - ne jamais committer
 /config/config.php
+/config/databases.txt
 /config/*.local.php
 .env
 

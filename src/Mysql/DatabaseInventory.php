@@ -18,7 +18,20 @@ final readonly class DatabaseInventory
         public array $databases,
         public array $probes,
         public bool $complete,
+        /**
+         * Vrai quand la liste des noms vient d'une declaration manuelle
+         * (hPanel) plutot que du serveur. Elle est alors exhaustive, meme si
+         * les tailles restent inconnues : c'est le rattachement qui decide
+         * d'une orpheline, pas le poids.
+         */
+        public bool $declared = false,
     ) {
+    }
+
+    /** Nombre de bases dont le contenu n'a pas pu etre mesure. */
+    public function unmeasuredCount(): int
+    {
+        return count(array_filter($this->databases, static fn (DatabaseInfo $d): bool => $d->unmeasured()));
     }
 
     public static function empty(): self
@@ -55,8 +68,21 @@ final readonly class DatabaseInventory
      */
     public function coverageNote(): string
     {
-        if ($this->probes === []) {
+        // La liste declaree prime : elle rend la question decidable meme
+        // quand aucun acces MySQL n'a abouti.
+        if ($this->probes === [] && !$this->declared) {
             return "Aucun acces MySQL n'a pu etre etabli : la liste des bases est vide, et aucune conclusion sur les orphelines n'est possible.";
+        }
+
+        if ($this->declared) {
+            $unmeasured = $this->unmeasuredCount();
+
+            return "Liste complete : les " . count($this->databases) . " bases proviennent de la liste declaree depuis hPanel, "
+                . "le rattachement aux sites est donc fiable."
+                . ($unmeasured > 0
+                    ? " En revanche, {$unmeasured} d'entre elles n'ont pas pu etre ouvertes : leur taille et leur date de "
+                        . "derniere ecriture restent inconnues."
+                    : '');
         }
 
         if ($this->complete) {

@@ -90,6 +90,16 @@ final class DatabaseInspector
     {
         $found = 0;
 
+        /*
+         * Une base reellement vide ne renvoie aucune ligne dans TABLES. Sans
+         * distinguer « la requete a echoue » de « elle n'a rien renvoye », une
+         * base vide passerait pour une base au contenu inconnu — et on
+         * perdrait justement l'indice le plus utile pour la nettoyer.
+         */
+        $stats = $this->listTableStats($gateway);
+        $measurable = $stats !== null;
+        $stats ??= [];
+
         foreach ($this->listSchemas($gateway) as $name => $meta) {
             $found++;
 
@@ -97,26 +107,28 @@ final class DatabaseInspector
             $info->charset ??= $meta['charset'];
             $info->collation ??= $meta['collation'];
             $info->addSource($gateway->label());
+            $info->measured = $info->measured || $measurable;
         }
 
-        foreach ($this->listTableStats($gateway) as $name => $stats) {
+        foreach ($stats as $name => $stat) {
             // Une base peut apparaitre ici sans avoir ete listee par SCHEMATA
             // si les privileges different entre les deux vues.
             $info = $databases[$name] ??= new DatabaseInfo($name);
             $info->addSource($gateway->label());
+            $info->measured = true;
 
             // On garde la valeur la plus elevee : deux acces peuvent voir des
             // sous-ensembles differents des tables d'une meme base.
-            $info->sizeBytes = max($info->sizeBytes, $stats['size_bytes']);
-            $info->tableCount = max($info->tableCount, $stats['table_count']);
-            $info->rowEstimate = max($info->rowEstimate, $stats['row_estimate']);
+            $info->sizeBytes = max($info->sizeBytes, $stat['size_bytes']);
+            $info->tableCount = max($info->tableCount, $stat['table_count']);
+            $info->rowEstimate = max($info->rowEstimate, $stat['row_estimate']);
 
-            if ($stats['updated_at'] !== null) {
-                $info->updatedAt = max($info->updatedAt ?? 0, $stats['updated_at']);
+            if ($stat['updated_at'] !== null) {
+                $info->updatedAt = max($info->updatedAt ?? 0, $stat['updated_at']);
             }
 
-            if ($stats['created_at'] !== null) {
-                $info->createdAt = min($info->createdAt ?? PHP_INT_MAX, $stats['created_at']);
+            if ($stat['created_at'] !== null) {
+                $info->createdAt = min($info->createdAt ?? PHP_INT_MAX, $stat['created_at']);
             }
         }
 
@@ -168,9 +180,11 @@ final class DatabaseInspector
     }
 
     /**
-     * @return array<string,array{table_count:int,size_bytes:int,row_estimate:int,updated_at:?int,created_at:?int}>
+     * @return array<string,array{table_count:int,size_bytes:int,row_estimate:int,updated_at:?int,created_at:?int}>|null
+     *         null quand la requete elle-meme a echoue, a distinguer d'un
+     *         resultat vide.
      */
-    private function listTableStats(MysqlGateway $gateway): array
+    private function listTableStats(MysqlGateway $gateway): ?array
     {
         try {
             $rows = $gateway->query(
@@ -184,7 +198,7 @@ final class DatabaseInspector
                 'GROUP BY TABLE_SCHEMA'
             );
         } catch (MysqlException) {
-            return [];
+            return null;
         }
 
         $stats = [];

@@ -7,9 +7,11 @@ namespace HostingerSpace\Scanner;
 use HostingerSpace\Analysis\Linker;
 use HostingerSpace\Config;
 use HostingerSpace\Model\Site;
+use HostingerSpace\Mysql\DatabaseInfo;
 use HostingerSpace\Mysql\DatabaseInspector;
 use HostingerSpace\Mysql\DatabaseInventory;
 use HostingerSpace\Mysql\GatewayFactory;
+use HostingerSpace\Mysql\KnownDatabases;
 use HostingerSpace\Mysql\MysqlCredential;
 use HostingerSpace\Network\HttpProbe;
 use HostingerSpace\Network\RdapProbe;
@@ -118,10 +120,16 @@ final class ScanRunner
         $credentials = $this->credentials($sites);
 
         if ($credentials === []) {
-            $this->errors[] = "Aucun acces MySQL disponible : aucune base n'a pu etre listee. " .
-                "Renseigne « mysql.admin_user » dans la configuration.";
+            // Meme sans le moindre acces MySQL, la liste declaree depuis
+            // hPanel suffit a rattacher les bases aux sites.
+            $inventory = $this->mergeDeclaredList(DatabaseInventory::empty());
 
-            return DatabaseInventory::empty();
+            if ($inventory->databases === []) {
+                $this->errors[] = "Aucun acces MySQL et aucune liste declaree : aucune base n'a pu etre listee. " .
+                    "Renseigne « mysql.admin_user », ou colle ta liste avec « php bin/hspace import-databases ».";
+            }
+
+            return $inventory;
         }
 
         $inventory = (new DatabaseInspector((new GatewayFactory($this->transport))->asCallable()))
@@ -131,9 +139,48 @@ final class ScanRunner
             $this->errors[] = "Acces MySQL refuse pour {$failure->label} (source : {$failure->source}) : {$failure->error}";
         }
 
-        ($this->report)('mysql', count($inventory->databases) . ' base(s) visible(s)');
+        $inventory = $this->mergeDeclaredList($inventory);
+
+        ($this->report)('mysql', count($inventory->databases) . ' base(s) connue(s)');
 
         return $inventory;
+    }
+
+    /**
+     * Complete l'inventaire avec la liste declaree depuis hPanel.
+     *
+     * Quand chaque base a son propre utilisateur — le cas courant chez
+     * Hostinger — aucun compte ne les voit toutes, et l'inventaire par MySQL
+     * reste incomplet quoi qu'on fasse. Mais decider qu'une base ne sert a
+     * personne ne demande pas de l'ouvrir : il suffit de connaitre son nom.
+     * La liste collee depuis hPanel rend donc la question decidable.
+     */
+    private function mergeDeclaredList(DatabaseInventory $inventory): DatabaseInventory
+    {
+        $declared = KnownDatabases::fromFile($this->config->string('mysql.known_databases_file'));
+
+        if ($declared === []) {
+            return $inventory;
+        }
+
+        $databases = $inventory->databases;
+        $added = 0;
+
+        foreach ($declared as $name) {
+            if (!isset($databases[$name])) {
+                $databases[$name] = new DatabaseInfo($name);
+                $added++;
+            }
+
+            $databases[$name]->addSource('liste hPanel');
+        }
+
+        ksort($databases, SORT_NATURAL | SORT_FLAG_CASE);
+
+        ($this->report)('mysql', count($declared) . ' base(s) declaree(s) depuis hPanel'
+            . ($added > 0 ? ", dont {$added} qu'aucun acces MySQL ne voyait" : ''));
+
+        return new DatabaseInventory($databases, $inventory->probes, complete: true, declared: true);
     }
 
     /**

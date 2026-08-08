@@ -208,6 +208,31 @@ sites. Mais il te le dira en tête de rapport, présentera les orphelines comme
 des pistes plutôt que des faits, et ne déclarera aucun site cassé — parce
 qu'une base invisible n'est pas une base absente.
 
+### Si aucun utilisateur ne peut voir toutes les bases
+
+C'est fréquent chez Hostinger : chaque base est créée avec son propre
+utilisateur, et hPanel ne permet pas toujours d'en rattacher un à toutes. La
+détection des orphelines y est alors structurellement impossible — les seules
+bases visibles sont celles rattachées aux comptes lus dans les sites, donc des
+bases déjà utilisées.
+
+Il y a une porte de sortie, et elle est même plus simple : **décider qu'une base
+ne sert à personne ne demande pas de l'ouvrir.** Il suffit de connaître son nom.
+
+```bash
+php bin/hspace import-databases     # colle le tableau de hPanel, puis Ctrl+D
+php bin/hspace scan
+```
+
+Copie le tableau complet de hPanel › Bases de données MySQL — le désordre du
+collage importe peu, y compris les « Accéder à phpMyAdmin » intercalés. hspace
+en extrait les noms de bases, en écartant la colonne des utilisateurs : les
+confondre inventerait des orphelines qui n'existent pas.
+
+Le rattachement devient alors fiable. Seules les tailles et les dates de
+dernière écriture restent inconnues, faute de pouvoir ouvrir les bases — et
+l'interface le dit plutôt que d'afficher zéro.
+
 ---
 
 ## Les commandes
@@ -219,6 +244,7 @@ qu'une base invisible n'est pas une base absente.
 | `scan` | Lance un relevé complet et l'enregistre |
 | `sites` | Liste les sites et leurs bases |
 | `databases` | Liste toutes les bases et les sites qui les utilisent |
+| `import-databases` | Enregistre la liste des bases copiée depuis hPanel |
 | `orphans` | Liste les bases qu'aucun site n'utilise |
 | `findings` | Constats du dernier relevé (`--critical`, `--warning`) |
 | `history` | Relevés enregistrés |

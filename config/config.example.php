@@ -100,6 +100,21 @@ return [
         // Utiliser aussi les identifiants trouves dans les sites pour elargir
         // la vue sur les bases (recommande, sans risque : lecture seule).
         'use_discovered_credentials' => true,
+
+        /*
+        | Liste des bases declaree a la main, copiee depuis hPanel.
+        |
+        | C'est la solution quand chaque base a son propre utilisateur et
+        | qu'aucun compte ne les voit toutes — le cas le plus frequent chez
+        | Hostinger. Repondre « quelles bases ne servent a personne » ne
+        | demande pas d'ouvrir les bases : il suffit de connaitre leurs noms
+        | et de les confronter a ce que les sites declarent.
+        |
+        | Pour remplir ce fichier : copie le tableau de hPanel > Bases de
+        | donnees MySQL, puis colle-le dans la commande
+        |     php bin/hspace import-databases
+        */
+        'known_databases_file' => __DIR__ . '/databases.txt',
     ],
 
     /*

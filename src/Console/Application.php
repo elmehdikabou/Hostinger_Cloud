@@ -10,6 +10,7 @@ use HostingerSpace\Console\Command\DiffCommand;
 use HostingerSpace\Console\Command\DoctorCommand;
 use HostingerSpace\Console\Command\FindingsCommand;
 use HostingerSpace\Console\Command\HistoryCommand;
+use HostingerSpace\Console\Command\ImportDatabasesCommand;
 use HostingerSpace\Console\Command\InitCommand;
 use HostingerSpace\Console\Command\OrphansCommand;
 use HostingerSpace\Console\Command\PasswordCommand;
@@ -32,6 +33,7 @@ final class Application
             new ScanCommand(),
             new SitesCommand(),
             new DatabasesCommand(),
+            new ImportDatabasesCommand(),
             new OrphansCommand(),
             new FindingsCommand(),
             new HistoryCommand(),
