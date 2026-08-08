@@ -140,6 +140,74 @@ test("Le selecteur de releve ne fige pas la navigation sur un vieux scan", funct
     assertSame('/sites', Fmt::url('/sites'));
 });
 
+test('Une base jamais ouverte ne se presente jamais comme vide', function () use ($sites): void {
+    /*
+     * Le cas d'un mutualise Hostinger : les bases sont connues par la seule
+     * liste hPanel, aucune n'a pu etre ouverte. Elles portent alors zero table
+     * et zero octet — la description exacte d'une coquille vide.
+     *
+     * L'interface disait donc « 43 bases totalement vides, les plus sures a
+     * supprimer », et le tableau de bord « aucune base inutilisee » juste sous
+     * le chiffre 43. Une base pleine designee comme sure a supprimer est la
+     * seule erreur de cet outil qui detruise des donnees.
+     */
+    $databases = [];
+
+    foreach (['u1_alpha', 'u1_t22AF', 'u1_Ceab4'] as $nom) {
+        $databases[$nom] = new \HostingerSpace\Mysql\DatabaseInfo($nom);
+    }
+
+    $inventaire = new \HostingerSpace\Mysql\DatabaseInventory(
+        $databases,
+        probes: [],
+        complete: true,
+        declared: true,
+    );
+
+    $chemin = sys_get_temp_dir() . '/hspace-inconnu-' . bin2hex(random_bytes(6)) . '.sqlite';
+    $base = new \HostingerSpace\Storage\Database($chemin);
+
+    (new ScanRepository($base))->save(new ScanResult(
+        startedAt: 1_770_000_000,
+        finishedAt: 1_770_000_100,
+        host: 'test',
+        mode: 'local',
+        sites: $sites,
+        inventory: $inventaire,
+        analysis: (new Linker(180))->analyse($sites, $inventaire),
+    ));
+
+    $noyau = new Kernel($base, dirname(__DIR__, 2) . '/templates', demo: true);
+
+    foreach (['/', '/databases', '/orphans', '/database'] as $route) {
+        $corps = $noyau->handle($route, $route === '/database' ? ['name' => 'u1_t22AF'] : [])->body;
+
+        assertFalse(
+            str_contains($corps, 'les plus sûres à supprimer'),
+            "{$route} ne doit designer aucune base comme sure a supprimer sans l'avoir ouverte"
+        );
+        assertFalse(
+            str_contains($corps, '>vide<'),
+            "{$route} ne doit pas etiqueter « vide » une base jamais ouverte"
+        );
+    }
+
+    // Le doute est dit, pas seulement tu.
+    assertContains('non ouverte', $noyau->handle('/orphans', [])->body);
+    assertContains('?', $noyau->handle('/databases', [])->body);
+    assertContains('jamais pu être ouverte', $noyau->handle('/database', ['name' => 'u1_t22AF'])->body);
+
+    // Et le tableau de bord ne dit pas « aucune base inutilisee » sous un
+    // compte d'orphelines non nul.
+    $accueil = $noyau->handle('/', [])->body;
+    assertFalse(str_contains($accueil, 'aucune base inutilisée'));
+    assertContains('taille inconnue', $accueil);
+
+    foreach ([$chemin, $chemin . '-wal', $chemin . '-shm'] as $fichier) {
+        @unlink($fichier);
+    }
+});
+
 register_shutdown_function(static function () use ($account, $path): void {
     $account->remove();
 

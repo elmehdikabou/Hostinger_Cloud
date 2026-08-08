@@ -62,7 +62,12 @@ final class ScanCommand implements Command
             'Scan' => "#{$scanId}",
             'Duree' => $result->duration() . ' s',
             'Sites' => (string) count($result->sites),
-            'Bases de donnees' => count($result->inventory->databases) . ' (' . Output::bytes($result->inventory->totalSize()) . ')',
+            // Annoncer « 45 (0 o) » quand aucune base n'a pu etre ouverte
+            // ferait passer un espace inconnu pour un espace vide.
+            'Bases de donnees' => count($result->inventory->databases) . ' ('
+                . ($result->inventory->unmeasuredCount() === count($result->inventory->databases)
+                    ? 'taille inconnue'
+                    : Output::bytes($result->inventory->totalSize())) . ')',
             'Bases orphelines' => (string) count($result->analysis->orphans),
             'Espace disque' => Output::bytes($result->totalDiskUsage()),
         ]);
@@ -129,11 +134,15 @@ final class ScanCommand implements Command
         foreach ($result->analysis->orphans as $name) {
             $info = $result->inventory->get($name);
 
+            // « ? » et non « 0 o » : cette base n'a jamais pu etre ouverte,
+            // donc rien ne dit qu'elle soit vide.
+            $known = $info !== null && $info->measured;
+
             $rows[] = [
                 $name,
-                $info === null ? '—' : (string) $info->tableCount,
-                $info === null ? '—' : Output::bytes($info->sizeBytes),
-                $info === null ? '—' : Output::since($info->updatedAt),
+                $info === null ? '—' : ($known ? (string) $info->tableCount : '?'),
+                $info === null ? '—' : ($known ? Output::bytes($info->sizeBytes) : '?'),
+                $info === null ? '—' : ($known ? Output::since($info->updatedAt) : '?'),
             ];
         }
 

@@ -108,6 +108,39 @@ final class Config
         return $mode;
     }
 
+    /**
+     * Chemin de la liste de bases declaree depuis hPanel.
+     *
+     * La cle « mysql.known_databases_file » est arrivee apres coup : une
+     * configuration ecrite avant elle ne la porte pas. Sans repli, l'import
+     * ecrivait bien le fichier a cote du config.php, mais le releve ne le
+     * relisait jamais — la liste importee disparaissait en silence, et les
+     * bases orphelines restaient introuvables sans le moindre message.
+     *
+     * On retombe donc sur « databases.txt », voisin du fichier de
+     * configuration : le meme chemin des deux cotes, cle presente ou non.
+     */
+    public function knownDatabasesFile(): ?string
+    {
+        $configured = $this->string('mysql.known_databases_file');
+
+        if ($configured !== null && trim($configured) !== '') {
+            return $configured;
+        }
+
+        // Une configuration montee en memoire n'a pas de voisinage sur le
+        // disque, et dirname() y repond « . » : sans ce garde-fou, on lirait
+        // le databases.txt du dossier courant, au hasard de l'endroit d'ou la
+        // commande est lancee.
+        if (!str_contains($this->sourcePath, DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        $directory = dirname($this->sourcePath);
+
+        return is_dir($directory) ? $directory . '/databases.txt' : null;
+    }
+
     public function storagePath(): string
     {
         $path = $this->string('storage.database') ?? dirname(__DIR__) . '/var/inventory.sqlite';

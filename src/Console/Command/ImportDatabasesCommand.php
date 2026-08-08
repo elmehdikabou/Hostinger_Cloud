@@ -132,12 +132,9 @@ final class ImportDatabasesCommand implements Command
 
     private function targetPath(Context $context): string
     {
-        $configured = $context->config()->string('mysql.known_databases_file');
-
-        if ($configured !== null && trim($configured) !== '') {
-            return $configured;
-        }
-
-        return dirname($context->config()->sourcePath) . '/databases.txt';
+        // Le meme chemin que celui relu par le releve : les deux passent par
+        // Config, sans quoi l'import ecrirait ou le scan ne regarde pas.
+        return $context->config()->knownDatabasesFile()
+            ?? dirname($context->config()->sourcePath) . '/databases.txt';
     }
 }

@@ -98,9 +98,11 @@ final class ScanRepository
         foreach ($result->inventory->databases as $name => $info) {
             $db->run(
                 'INSERT INTO databases (scan_id, name, size_bytes, table_count, row_estimate, created_at,
-                    updated_at, charset, collation, discovered_via, is_orphan)
-                 VALUES (:scan, :name, :size, :tables, :rows, :created, :updated, :charset, :collation, :via, :orphan)',
+                    updated_at, charset, collation, discovered_via, is_orphan, measured)
+                 VALUES (:scan, :name, :size, :tables, :rows, :created, :updated, :charset, :collation,
+                    :via, :orphan, :measured)',
                 [
+                    ':measured' => $info->measured ? 1 : 0,
                     ':scan' => $scanId,
                     ':name' => $name,
                     ':size' => $info->sizeBytes,

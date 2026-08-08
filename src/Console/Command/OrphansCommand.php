@@ -73,22 +73,42 @@ final class OrphansCommand implements Command
 
         $rows = [];
         $total = 0;
+        $unmeasured = 0;
 
         foreach ($orphans as $database) {
-            $total += (int) $database['size_bytes'];
+            // Une base jamais ouverte n'a pas ete mesuree a zero : sa taille
+            // est inconnue. L'afficher « 0 o » la designerait comme un reste
+            // sans importance, alors qu'elle peut etre pleine.
+            $measured = (int) ($database['measured'] ?? 1) === 1;
+
+            if ($measured) {
+                $total += (int) $database['size_bytes'];
+            } else {
+                $unmeasured++;
+            }
 
             $rows[] = [
                 $database['name'],
-                (string) $database['table_count'],
-                Output::bytes((int) $database['size_bytes']),
-                Output::since($database['updated_at'] === null ? null : (int) $database['updated_at']),
+                $measured ? (string) $database['table_count'] : '?',
+                $measured ? Output::bytes((int) $database['size_bytes']) : '?',
+                $measured
+                    ? Output::since($database['updated_at'] === null ? null : (int) $database['updated_at'])
+                    : '?',
             ];
         }
 
         $out->table(['Base', 'Tables', 'Taille', 'Derniere ecriture'], $rows, [1 => true, 2 => true]);
 
         $out->line();
-        $out->info('Espace potentiellement recuperable : ' . Output::bytes($total));
+
+        if ($unmeasured === count($orphans)) {
+            $out->info("Aucune de ces bases n'a pu etre ouverte : leur taille reste inconnue.");
+            $out->dim('  Le rattachement, lui, est etabli : aucun site ne les declare.');
+        } else {
+            $out->info('Espace potentiellement recuperable : ' . Output::bytes($total)
+                . ($unmeasured > 0 ? ", plus {$unmeasured} base(s) de taille inconnue" : ''));
+        }
+
         $out->line();
 
         if ((int) $scan['coverage_complete'] !== 1) {

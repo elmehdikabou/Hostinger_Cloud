@@ -152,6 +152,42 @@ test('La liste declaree rend les orphelines decidables sans MySQL', function ():
     $supprimer($racine);
 });
 
+test('Une configuration anterieure a la cle retrouve quand meme la liste', function (): void {
+    /*
+     * Regression : « mysql.known_databases_file » est arrivee apres la mise
+     * en service. Une configuration ecrite avant ne la porte pas — et l'import
+     * ecrivait alors databases.txt a cote du config.php pendant que le releve
+     * cherchait un chemin nul. La liste importee etait ignoree en silence :
+     * l'utilisateur voyait « 45 bases enregistrees », puis zero au scan.
+     */
+    $racine = sys_get_temp_dir() . '/hspace-cle-' . bin2hex(random_bytes(6));
+    mkdir($racine, 0o775, true);
+    file_put_contents($racine . '/databases.txt', "u1_alpha\nu1_beta\nu1_gamma\n");
+
+    $ancienne = Config::fromArray(
+        ['mode' => 'local', 'mysql' => ['user' => 'x']],
+        $racine . '/config.php',
+    );
+
+    assertSame($racine . '/databases.txt', $ancienne->knownDatabasesFile());
+    assertCount(3, KnownDatabases::fromFile($ancienne->knownDatabasesFile()));
+
+    // Une cle explicite reste prioritaire sur le voisinage.
+    $explicite = Config::fromArray(
+        ['mysql' => ['known_databases_file' => '/ailleurs/liste.txt']],
+        $racine . '/config.php',
+    );
+
+    assertSame('/ailleurs/liste.txt', $explicite->knownDatabasesFile());
+
+    // Une configuration montee en memoire n'a pas de voisin sur le disque :
+    // sans ce garde-fou elle lirait un databases.txt du dossier courant.
+    assertSame(null, Config::fromArray([])->knownDatabasesFile());
+
+    unlink($racine . '/databases.txt');
+    rmdir($racine);
+});
+
 test('Une liste declaree suffit meme sans le moindre acces MySQL', function (): void {
     $inventaire = new DatabaseInventory(
         ['u1_alpha' => new DatabaseInfo('u1_alpha')],

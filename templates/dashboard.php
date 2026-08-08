@@ -14,9 +14,15 @@ require_once __DIR__ . '/_partials.php';
  * @var array<int,array<string,mixed>> $stale
  */
 
-$orphanBytes = array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $orphans));
+// Les bases connues par leur seul nom ne pesent pas zero octet : leur poids
+// est inconnu. Les additionner reviendrait a annoncer un espace recuperable
+// bien plus faible que la realite.
+$measuredOrphans = array_values(array_filter($orphans, Fmt::measured(...)));
+$measuredDatabases = array_values(array_filter($biggestDatabases, Fmt::measured(...)));
+
+$orphanBytes = array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $measuredOrphans));
 $maxSite = max(1, ...array_map(static fn (array $s): int => (int) $s['size_bytes'], $biggestSites ?: [['size_bytes' => 1]]));
-$maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_bytes'], $biggestDatabases ?: [['size_bytes' => 1]]));
+$maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_bytes'], $measuredDatabases ?: [['size_bytes' => 1]]));
 
 ?>
 <div class="page-head">
@@ -46,7 +52,9 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
     <a class="card kpi" href="<?= Fmt::url('/databases') ?>">
         <div class="value"><?= Fmt::e(Fmt::number($scan['database_count'])) ?></div>
         <div class="label">Bases de données</div>
-        <div class="hint"><?= Fmt::e(Fmt::bytes($scan['database_bytes'])) ?> au total</div>
+        <div class="hint"><?= (int) $scan['database_bytes'] === 0 && (int) $scan['database_count'] > 0
+            ? 'taille inconnue — aucune n’a pu être ouverte'
+            : Fmt::e(Fmt::bytes($scan['database_bytes'])) . ' au total' ?></div>
     </a>
 
     <?php
@@ -61,9 +69,23 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
     <a class="card kpi <?= !$orphansKnown ? '' : ((int) $scan['orphan_count'] > 0 ? 'is-warning' : 'is-ok') ?>" href="<?= Fmt::url('/orphans') ?>">
         <div class="value"><?= $orphansKnown ? Fmt::e(Fmt::number($scan['orphan_count'])) : '?' ?></div>
         <div class="label">Bases orphelines</div>
-        <div class="hint"><?= $orphansKnown
-            ? ($orphanBytes > 0 ? Fmt::e(Fmt::bytes($orphanBytes)) . ' récupérables' : 'aucune base inutilisée')
-            : 'indéterminé — accès MySQL partiel' ?></div>
+        <div class="hint"><?php
+            /*
+             * « Aucune base inutilisée » ne doit sortir que si le compte est
+             * bien zero. Avec 43 orphelines jamais ouvertes, la somme des
+             * tailles vaut zero elle aussi — et la carte affichait alors « 43 »
+             * au-dessus de « aucune base inutilisée ».
+             */
+            if (!$orphansKnown) {
+                echo 'indéterminé — accès MySQL partiel';
+            } elseif ((int) $scan['orphan_count'] === 0) {
+                echo 'aucune base inutilisée';
+            } elseif ($orphanBytes > 0) {
+                echo Fmt::e(Fmt::bytes($orphanBytes)), ' récupérables';
+            } else {
+                echo 'taille inconnue — jamais ouvertes';
+            }
+        ?></div>
     </a>
 
     <a class="card kpi <?= $counts['critical'] > 0 ? 'is-critical' : 'is-ok' ?>" href="<?= Fmt::url('/findings?severity=critical') ?>">
@@ -91,10 +113,23 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
     <div>
         <section class="card">
             <h2>Bases les plus lourdes</h2>
+            <?php if ($measuredDatabases === []) : ?>
+                <?php
+                /*
+                 * Un classement par taille n'a aucun sens quand aucune taille
+                 * n'a ete mesuree : il afficherait cinq bases au hasard, toutes
+                 * a « 0 o », et donnerait l'impression d'un espace vide.
+                 */
+                ?>
+                <p class="muted">
+                    Aucune base n’a pu être ouverte : les tailles sont inconnues.
+                    Le classement demande un accès MySQL à ces bases.
+                </p>
+            <?php else : ?>
             <div class="table-wrap">
             <table>
                 <tbody>
-                <?php foreach ($biggestDatabases as $database) : ?>
+                <?php foreach ($measuredDatabases as $database) : ?>
                     <tr>
                         <td>
                             <a href="<?= Fmt::databaseUrl((string) $database['name']) ?>"><?= Fmt::e((string) $database['name']) ?></a>
@@ -109,6 +144,7 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
                 </tbody>
             </table>
             </div>
+            <?php endif ?>
         </section>
 
         <section class="card">

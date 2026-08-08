@@ -229,9 +229,20 @@ collage importe peu, y compris les « Accéder à phpMyAdmin » intercalés. hsp
 en extrait les noms de bases, en écartant la colonne des utilisateurs : les
 confondre inventerait des orphelines qui n'existent pas.
 
+Si ton terminal avale les collages multi-lignes, passe par un fichier :
+
+```bash
+php bin/hspace import-databases mes-bases.txt
+```
+
 Le rattachement devient alors fiable. Seules les tailles et les dates de
-dernière écriture restent inconnues, faute de pouvoir ouvrir les bases — et
-l'interface le dit plutôt que d'afficher zéro.
+dernière écriture restent inconnues, faute de pouvoir ouvrir les bases.
+
+**Ces bases-là s'affichent « ? », jamais « 0 ».** Une base connue par son seul
+nom a bien zéro table et zéro octet enregistrés, mais c'est l'absence de mesure,
+pas un constat de vacuité. L'afficher « vide » la ferait passer pour la plus
+sûre à supprimer alors que personne n'a regardé dedans : c'est la seule erreur
+de cet outil qui détruirait des données.
 
 ---
 

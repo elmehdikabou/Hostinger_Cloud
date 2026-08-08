@@ -157,7 +157,7 @@ final class ScanRunner
      */
     private function mergeDeclaredList(DatabaseInventory $inventory): DatabaseInventory
     {
-        $declared = KnownDatabases::fromFile($this->config->string('mysql.known_databases_file'));
+        $declared = KnownDatabases::fromFile($this->config->knownDatabasesFile());
 
         if ($declared === []) {
             return $inventory;

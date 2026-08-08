@@ -34,21 +34,33 @@ $sources = ScanRepository::decode($database['discovered_via']);
 <div class="grid grid-2">
     <section class="card">
         <h2>Caractéristiques</h2>
+
+        <?php if (!Fmt::measured($database)) : ?>
+            <div class="notice">
+                <strong>Cette base n’a jamais pu être ouverte</strong>
+                Son nom vient de la liste déclarée depuis hPanel. Aucun accès MySQL ne l’a
+                atteinte, donc sa taille, ses tables et sa date de dernière écriture sont
+                inconnues — pas nulles. Sauvegarde-la avant d’en faire quoi que ce soit.
+            </div>
+        <?php endif ?>
+
         <dl class="pairs">
             <dt>Taille</dt>
-            <dd><?= Fmt::e(Fmt::bytes($database['size_bytes'])) ?></dd>
+            <dd><?= Fmt::e(Fmt::measuredValue($database, Fmt::bytes($database['size_bytes']))) ?></dd>
 
             <dt>Tables</dt>
-            <dd><?= Fmt::e(Fmt::number($database['table_count'])) ?></dd>
+            <dd><?= Fmt::e(Fmt::measuredValue($database, Fmt::number($database['table_count']))) ?></dd>
 
             <dt>Lignes estimées</dt>
-            <dd><?= Fmt::e(Fmt::number($database['row_estimate'])) ?></dd>
+            <dd><?= Fmt::e(Fmt::measuredValue($database, Fmt::number($database['row_estimate']))) ?></dd>
 
             <dt>Créée le</dt>
-            <dd><?= Fmt::e(Fmt::date($database['created_at'])) ?></dd>
+            <dd><?= Fmt::e(Fmt::measuredValue($database, Fmt::date($database['created_at']))) ?></dd>
 
             <dt>Dernière écriture</dt>
-            <dd><?= Fmt::e(Fmt::since($database['updated_at'])) ?> <span class="muted">(<?= Fmt::e(Fmt::date($database['updated_at'])) ?>)</span></dd>
+            <dd><?= Fmt::measured($database)
+                ? Fmt::e(Fmt::since($database['updated_at'])) . ' <span class="muted">(' . Fmt::e(Fmt::date($database['updated_at'])) . ')</span>'
+                : '?' ?></dd>
 
             <dt>Jeu de caractères</dt>
             <dd class="mono"><?= Fmt::e((string) ($database['charset'] ?? '—')) ?></dd>

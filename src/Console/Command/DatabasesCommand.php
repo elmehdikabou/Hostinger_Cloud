@@ -72,14 +72,20 @@ final class DatabasesCommand implements Command
             $name = (string) $database['name'];
             $sites = array_values(array_unique($usage[$name] ?? []));
 
+            // « 0 table, 0 o » decrit une coquille vide. Une base jamais
+            // ouverte merite « ? » : son contenu est inconnu, pas nul.
+            $measured = (int) ($database['measured'] ?? 1) === 1;
+
             $rows[] = [
                 $name,
-                (string) $database['table_count'],
-                Output::bytes((int) $database['size_bytes']),
+                $measured ? (string) $database['table_count'] : '?',
+                $measured ? Output::bytes((int) $database['size_bytes']) : '?',
                 $sites === []
                     ? ($complete ? 'AUCUN SITE' : 'aucun site vu')
                     : implode(', ', $sites),
-                Output::since($database['updated_at'] === null ? null : (int) $database['updated_at']),
+                $measured
+                    ? Output::since($database['updated_at'] === null ? null : (int) $database['updated_at'])
+                    : '?',
             ];
         }
 
@@ -89,10 +95,24 @@ final class DatabasesCommand implements Command
             [1 => true, 2 => true]
         );
 
-        $out->line();
-        $out->info(count($databases) . ' base(s) — ' . Output::bytes(
-            array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $databases))
+        $measured = array_values(array_filter(
+            $databases,
+            static fn (array $d): bool => (int) ($d['measured'] ?? 1) === 1
         ));
+
+        $out->line();
+
+        if ($measured === []) {
+            $out->info(count($databases) . ' base(s) — aucune n\'a pu etre ouverte, les tailles sont inconnues.');
+        } else {
+            $out->info(count($databases) . ' base(s) — ' . Output::bytes(
+                array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $measured))
+            ) . ' mesures sur ' . count($measured) . ' d\'entre elles');
+        }
+
+        if (count($measured) < count($databases)) {
+            $out->dim('  « ? » : base connue par son nom seulement, jamais ouverte. Ni vide ni pleine — inconnue.');
+        }
 
         $this->explainCoverage($out, $complete, $context);
 
@@ -110,7 +130,8 @@ final class DatabasesCommand implements Command
         $out->line();
 
         if ($complete) {
-            $out->success('Vue complete du serveur : cette liste est exhaustive.');
+            $out->success('Liste exhaustive : le rattachement aux sites est donc fiable.');
+            $out->dim('  Une base marquee AUCUN SITE ne sert vraiment a aucun site analyse.');
             $out->line();
 
             return;

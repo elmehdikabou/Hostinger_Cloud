@@ -9,10 +9,20 @@ require_once __DIR__ . '/_partials.php';
  * @var array<string,mixed>            $scan
  */
 
-$total = array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $orphans));
+/*
+ * Une base connue par la seule liste hPanel n'a jamais ete ouverte : ses zero
+ * table et zero octet sont l'absence de mesure, pas un constat de vacuite. Les
+ * compter avec les autres afficherait « 43 bases totalement vides, les plus
+ * sures a supprimer » a propos de bases dont nul ne sait ce qu'elles
+ * contiennent. On les met donc a part partout.
+ */
+$measured = array_values(array_filter($orphans, Fmt::measured(...)));
+$total = array_sum(array_map(static fn (array $d): int => (int) $d['size_bytes'], $measured));
+$empty = count(array_filter($measured, static fn (array $d): bool => (int) $d['table_count'] === 0));
+$unknown = count($orphans) - count($measured);
 $max = 1;
 
-foreach ($orphans as $orphan) {
+foreach ($measured as $orphan) {
     $max = max($max, (int) $orphan['size_bytes']);
 }
 
@@ -82,15 +92,25 @@ foreach ($orphans as $orphan) {
             <div class="label">Bases sans site</div>
         </div>
         <div class="card kpi">
-            <div class="value"><?= Fmt::e(Fmt::bytes($total)) ?></div>
+            <div class="value"><?= $measured === [] ? '?' : Fmt::e(Fmt::bytes($total)) ?></div>
             <div class="label">Espace concerné</div>
-            <div class="hint">récupérable après vérification</div>
+            <div class="hint"><?= $measured === []
+                ? 'aucune de ces bases n’a pu être ouverte'
+                : 'récupérable après vérification' ?></div>
         </div>
-        <div class="card kpi">
-            <div class="value"><?= count(array_filter($orphans, static fn (array $d): bool => (int) $d['table_count'] === 0)) ?></div>
-            <div class="label">Dont totalement vides</div>
-            <div class="hint">les plus sûres à supprimer</div>
-        </div>
+        <?php if ($unknown > 0) : ?>
+            <div class="card kpi">
+                <div class="value"><?= $unknown ?></div>
+                <div class="label">Contenu inconnu</div>
+                <div class="hint">jamais ouvertes — à sauvegarder avant tout</div>
+            </div>
+        <?php else : ?>
+            <div class="card kpi">
+                <div class="value"><?= $empty ?></div>
+                <div class="label">Dont totalement vides</div>
+                <div class="hint">les plus sûres à supprimer</div>
+            </div>
+        <?php endif ?>
     </div>
 
     <section class="card">
@@ -111,15 +131,17 @@ foreach ($orphans as $orphan) {
                     <tr>
                         <td>
                             <a href="<?= Fmt::databaseUrl((string) $orphan['name']) ?>" class="mono"><?= Fmt::e((string) $orphan['name']) ?></a>
-                            <?php if ((int) $orphan['table_count'] === 0) : ?>
+                            <?php if (!Fmt::measured($orphan)) : ?>
+                                <span class="badge neutral">non ouverte</span>
+                            <?php elseif ((int) $orphan['table_count'] === 0) : ?>
                                 <span class="badge neutral">vide</span>
                             <?php endif ?>
                         </td>
-                        <td class="num"><?= Fmt::e(Fmt::number($orphan['table_count'])) ?></td>
-                        <td><?= hs_bar((int) $orphan['size_bytes'], $max, true) ?></td>
-                        <td class="num"><?= Fmt::e(Fmt::bytes($orphan['size_bytes'])) ?></td>
-                        <td class="num muted"><?= Fmt::e(Fmt::date($orphan['created_at'])) ?></td>
-                        <td class="num muted"><?= Fmt::e(Fmt::since($orphan['updated_at'])) ?></td>
+                        <td class="num"><?= Fmt::e(Fmt::measuredValue($orphan, Fmt::number($orphan['table_count']))) ?></td>
+                        <td><?= Fmt::measured($orphan) ? hs_bar((int) $orphan['size_bytes'], $max, true) : '' ?></td>
+                        <td class="num"><?= Fmt::e(Fmt::measuredValue($orphan, Fmt::bytes($orphan['size_bytes']))) ?></td>
+                        <td class="num muted"><?= Fmt::e(Fmt::measuredValue($orphan, Fmt::date($orphan['created_at']))) ?></td>
+                        <td class="num muted"><?= Fmt::e(Fmt::measuredValue($orphan, Fmt::since($orphan['updated_at']))) ?></td>
                     </tr>
                 <?php endforeach ?>
                 </tbody>

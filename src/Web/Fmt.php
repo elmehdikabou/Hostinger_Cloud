@@ -83,6 +83,29 @@ final class Fmt
         return number_format((int) $value, 0, ',', ' ');
     }
 
+    /**
+     * Une base a-t-elle reellement ete ouverte et mesuree ?
+     *
+     * Les bases connues par la seule liste hPanel ne l'ont pas ete : elles
+     * portent zero table et zero octet faute de mesure, pas parce qu'elles
+     * sont vides. Les afficher comme vides serait une invitation a supprimer
+     * une base pleine.
+     *
+     * @param array<string,mixed> $database Ligne issue de la table databases.
+     */
+    public static function measured(array $database): bool
+    {
+        // Les releves anterieurs a la colonne n'ont que des bases mesurees :
+        // en leur absence, l'ancienne lecture reste la bonne.
+        return (int) ($database['measured'] ?? 1) === 1;
+    }
+
+    /** Une mesure, ou « ? » quand la base n'a jamais pu etre ouverte. */
+    public static function measuredValue(array $database, string $formatted): string
+    {
+        return self::measured($database) ? $formatted : '?';
+    }
+
     public static function severityLabel(string $severity): string
     {
         return match ($severity) {

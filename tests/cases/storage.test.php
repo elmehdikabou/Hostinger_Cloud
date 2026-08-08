@@ -176,6 +176,38 @@ test("L'historique est borne pour ne pas grossir indefiniment", function () use 
     assertCount(1, $repository->scans());
 });
 
+test('Une base de releves anterieure gagne la colonne « mesuree »', function (): void {
+    /*
+     * L'utilisateur a deja des releves en place : la colonne doit arriver par
+     * migration, sans repartir de zero. Et les lignes deja ecrites viennent
+     * toutes d'un acces MySQL reel — elles sont donc mesurees, sous peine de
+     * voir un espace connu se couvrir de « ? » du jour au lendemain.
+     */
+    $chemin = sys_get_temp_dir() . '/hspace-migr-' . bin2hex(random_bytes(6)) . '.sqlite';
+
+    // Un fichier au schema d'origine, sans la colonne, avec une ligne dedans.
+    $pdo = new PDO('sqlite:' . $chemin);
+    $pdo->exec('CREATE TABLE databases (id INTEGER PRIMARY KEY, name TEXT NOT NULL, size_bytes INTEGER)');
+    $pdo->exec("INSERT INTO databases (name, size_bytes) VALUES ('u1_ancienne', 4096)");
+    $pdo->exec('PRAGMA user_version = 1');
+    $pdo = null;
+
+    new Database($chemin);
+
+    $relu = new PDO('sqlite:' . $chemin);
+    assertSame(2, (int) $relu->query('PRAGMA user_version')->fetchColumn());
+    assertSame(1, (int) $relu->query("SELECT measured FROM databases WHERE name = 'u1_ancienne'")->fetchColumn());
+    assertSame(4096, (int) $relu->query("SELECT size_bytes FROM databases WHERE name = 'u1_ancienne'")->fetchColumn());
+    $relu = null;
+
+    // Rouvrir ne rejoue pas la migration — l'ALTER echouerait en doublon.
+    new Database($chemin);
+
+    foreach ([$chemin, $chemin . '-wal', $chemin . '-shm'] as $fichier) {
+        @unlink($fichier);
+    }
+});
+
 register_shutdown_function(static function () use ($account, $path): void {
     $account->remove();
 

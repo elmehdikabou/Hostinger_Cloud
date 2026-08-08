@@ -14,7 +14,7 @@ namespace HostingerSpace\Storage;
  */
 final class Database
 {
-    private const SCHEMA_VERSION = 1;
+    private const SCHEMA_VERSION = 2;
 
     private \PDO $pdo;
 
@@ -116,6 +116,17 @@ final class Database
 
         if ($current < 1) {
             $this->pdo->exec($this->initialSchema());
+        }
+
+        if ($current < 2) {
+            /*
+             * Distinguer « mesuree a zero » de « jamais ouverte ». Sans cette
+             * colonne, une base connue par la seule liste hPanel s'affichait
+             * « 0 table, 0 o » : la description exacte d'une coquille vide,
+             * alors que son contenu n'a jamais ete regarde. C'est le genre de
+             * ligne qui fait supprimer une base pleine.
+             */
+            $this->pdo->exec('ALTER TABLE databases ADD COLUMN measured INTEGER NOT NULL DEFAULT 1');
         }
 
         $this->pdo->exec('PRAGMA user_version = ' . self::SCHEMA_VERSION);
