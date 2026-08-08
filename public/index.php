@@ -48,10 +48,27 @@ try {
     }
 
     if (!is_file($databasePath)) {
-        throw new RuntimeException(
-            "Aucune base d'inventaire à {$databasePath}. Lance d'abord « php bin/hspace scan », " .
-            "ou « php bin/hspace demo » pour des données de démonstration."
-        );
+        /*
+         * Aucun releve n'a encore ete enregistre. Ce n'est pas une panne mais
+         * une installation inachevee : on le dit clairement, sans divulguer le
+         * chemin du fichier a un visiteur de passage.
+         */
+        (new Response(
+            '<!doctype html><meta charset="utf-8"><title>Inventaire vide — hspace</title>'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            . '<meta name="robots" content="noindex, nofollow">'
+            . '<link rel="stylesheet" href="/assets/app.css">'
+            . '<div class="gate"><div class="gate-card gate-card--wide">'
+            . '<h1>Aucun relevé pour l\'instant</h1>'
+            . '<p class="subtitle">L\'application est en place, mais elle n\'a encore rien à montrer.</p>'
+            . '<p>Depuis un terminal, à la racine du projet :</p>'
+            . '<code class="command">php bin/hspace scan</code>'
+            . '<p class="muted">Recharge cette page ensuite.</p>'
+            . '</div></div>',
+            503
+        ))->send();
+
+        return;
     }
 
     (new Kernel(
@@ -69,13 +86,23 @@ try {
         ->send();
 } catch (Throwable $e) {
     /*
+     * Le detail part dans le journal du serveur avant toute chose. Sans cette
+     * ligne, la page renvoyait le proprietaire vers « les journaux » alors que
+     * rien n'y etait jamais ecrit : un cul-de-sac au pire moment.
+     */
+    error_log('hspace: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')');
+
+    /*
      * Le detail n'est montre qu'a la machine locale. Sur un hebergement, un
      * message d'erreur revelerait des chemins et des noms de fichiers a qui
      * n'a pas encore passe la page de connexion.
      */
     $detail = Auth::isLocalClient($_SERVER)
         ? htmlspecialchars($e->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
-        : "Le détail est masqué. Consulte les journaux du serveur, ou ouvre l'interface depuis la machine locale.";
+        : "Le détail a été écrit dans le journal d'erreurs du serveur.\n\n"
+            . "Pour le lire, en SSH à la racine du projet :\n"
+            . "    php bin/hspace doctor\n"
+            . "    tail -n 20 ../error_log";
 
     (new Response(
         '<!doctype html><meta charset="utf-8"><title>Erreur</title>'
