@@ -235,3 +235,68 @@ test('Une liste declaree suffit meme sans le moindre acces MySQL', function (): 
     assertContains('taille', $inventaire->coverageNote());
     assertSame(1, $inventaire->unmeasuredCount());
 });
+
+test('Un scan a couverture partielle reclame la liste au lieu de se taire', function (): void {
+    /*
+     * Trois relances de « scan » d'affilee peuvent rendre 13 bases et zero
+     * orpheline sans qu'aucune ligne n'indique qu'il manque l'etape decisive.
+     * Le resultat a l'air normal, et l'etape la plus importante de l'outil
+     * reste invisible a qui ne l'a pas lue ailleurs. Le moment ou le manque
+     * est constate est le seul ou l'instruction sert : elle s'affiche donc la.
+     */
+    $racine = sys_get_temp_dir() . '/hspace-reclame-' . bin2hex(random_bytes(6));
+    mkdir($racine . '/domains/site.fr/public_html', 0o775, true);
+    file_put_contents($racine . '/domains/site.fr/public_html/index.html', '<h1>site</h1>');
+
+    $configPath = $racine . '/config.php';
+    file_put_contents($configPath, '<?php return ' . var_export([
+        'mode' => 'local',
+        'paths' => ['home' => $racine, 'domains_dir' => $racine . '/domains', 'ignore' => []],
+        'mysql' => ['credentials' => []],
+        'storage' => ['database' => $racine . '/inventaire.sqlite'],
+        'network' => ['check_http' => false, 'check_ssl' => false, 'check_domain' => false],
+        'analysis' => ['max_depth' => 3],
+    ], true) . ';');
+
+    $flux = fopen('php://memory', 'w+');
+    (new HostingerSpace\Console\Command\ScanCommand())->run(
+        [],
+        new HostingerSpace\Console\Output($flux),
+        new HostingerSpace\Console\Context($configPath),
+    );
+
+    rewind($flux);
+    $affiche = (string) stream_get_contents($flux);
+    fclose($flux);
+
+    assertContains('import-databases', $affiche, "le scan doit nommer la commande qui debloque la situation");
+    assertContains('indeterminable', $affiche, "zero orpheline ne doit pas etre presente comme un resultat");
+
+    // Et une fois la liste en place, le rappel disparait : il ne doit pas
+    // devenir un avertissement permanent qu'on apprend a ignorer.
+    file_put_contents($racine . '/databases.txt', "u1_alpha\nu1_beta\nu1_gamma\n");
+
+    $flux = fopen('php://memory', 'w+');
+    (new HostingerSpace\Console\Command\ScanCommand())->run(
+        [],
+        new HostingerSpace\Console\Output($flux),
+        new HostingerSpace\Console\Context($configPath),
+    );
+
+    rewind($flux);
+    $apres = (string) stream_get_contents($flux);
+    fclose($flux);
+
+    assertFalse(str_contains($apres, 'Il manque la liste'), 'le rappel doit disparaitre une fois la liste lue');
+    assertContains('3', $apres);
+
+    $supprimer = static function (string $chemin) use (&$supprimer): void {
+        foreach (glob($chemin . '/*') ?: [] as $entree) {
+            is_dir($entree) ? $supprimer($entree) : unlink($entree);
+        }
+
+        @rmdir($chemin);
+    };
+
+    $supprimer($racine);
+});

@@ -68,12 +68,18 @@ final class ScanCommand implements Command
                 . ($result->inventory->unmeasuredCount() === count($result->inventory->databases)
                     ? 'taille inconnue'
                     : Output::bytes($result->inventory->totalSize())) . ')',
-            'Bases orphelines' => (string) count($result->analysis->orphans),
+            // Sans liste declaree ni acces global, zero orpheline n'est pas un
+            // resultat : c'est le seul resultat possible. Le chiffre mentirait.
+            'Bases orphelines' => $result->inventory->complete
+                ? (string) count($result->analysis->orphans)
+                : '? (indeterminable en l\'etat)',
             'Espace disque' => Output::bytes($result->totalDiskUsage()),
         ]);
 
         $out->line();
         $out->dim('  ' . $result->inventory->coverageNote());
+
+        $this->showMissingList($out, $result, $context);
 
         foreach ($result->errors as $error) {
             $out->warn($error);
@@ -91,6 +97,39 @@ final class ScanCommand implements Command
         $out->line();
 
         return 0;
+    }
+
+    /**
+     * Dit au scan lui-meme ce qu'il lui manque pour repondre.
+     *
+     * Un scan a couverture partielle rendait un resultat d'apparence normale :
+     * rien ne signalait qu'il manquait l'etape decisive. On pouvait relancer
+     * « scan » indefiniment sans jamais voir une orpheline, sans jamais savoir
+     * pourquoi. Le moment ou l'on constate le manque est aussi le seul ou
+     * l'instruction sert a quelque chose : elle va donc ici, en clair.
+     */
+    private function showMissingList(
+        Output $out,
+        \HostingerSpace\Scanner\ScanResult $result,
+        Context $context,
+    ): void {
+        if ($result->inventory->complete) {
+            return;
+        }
+
+        $out->line();
+        $out->warn('Il manque la liste de tes bases : les orphelines restent indeterminables.');
+        $out->line();
+        $out->line('  Seules ' . count($result->inventory->databases) . ' base(s) sont visibles —'
+            . ' celles que tes sites declarent, donc utilisees par construction.');
+        $out->line('  Une base qu\'aucun site n\'utilise ne peut pas apparaitre ici.');
+        $out->line();
+        $out->line('  Copie le tableau de hPanel > Bases de donnees MySQL, puis :');
+        $out->line();
+        $out->line('      php bin/hspace import-databases     (colle, puis Ctrl+D)');
+        $out->line('      php bin/hspace scan');
+        $out->line();
+        $out->dim('  La liste sera lue dans ' . ($context->config()->knownDatabasesFile() ?? 'config/databases.txt') . '.');
     }
 
     /** @param array<int,\HostingerSpace\Model\Finding> $findings */

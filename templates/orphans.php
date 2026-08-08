@@ -65,18 +65,27 @@ foreach ($measured as $orphan) {
             précisément celle qu'on cherche.
         </div>
 
-        <h2>Obtenir la vue complète</h2>
+        <h2>Obtenir la réponse</h2>
+        <p class="subtitle">
+            Décider qu'une base ne sert à personne ne demande pas de l'ouvrir : il suffit de
+            connaître son nom. Copie le tableau de hPanel &gt; Bases de données MySQL, et la
+            question devient décidable sans le moindre accès supplémentaire.
+        </p>
         <ol class="actions">
-            <li>hPanel &gt; Bases de données MySQL &gt; crée un utilisateur, puis rattache-le à
-                <strong>toutes</strong> tes bases.</li>
-            <li>Renseigne-le dans <code>config/config.php</code>, section <code>mysql</code> :
-                <code class="command">'admin_user' =&gt; 'uXXXXXXXXX_inventaire',
-'admin_password' =&gt; '…',</code>
+            <li>Colle la liste, puis <kbd>Ctrl+D</kbd> :
+                <code class="command">php bin/hspace import-databases</code>
             </li>
             <li>Relance le relevé :
                 <code class="command">php bin/hspace scan</code>
             </li>
         </ol>
+
+        <p class="subtitle">
+            Les tailles resteront inconnues faute de pouvoir ouvrir ces bases — mais c'est le
+            rattachement qui décide d'une orpheline, pas le poids. Si tu préfères la vue complète
+            par MySQL, crée dans hPanel un utilisateur rattaché à <strong>toutes</strong> tes bases
+            et renseigne <code>mysql.admin_user</code> dans <code>config/config.php</code>.
+        </p>
     </section>
 <?php elseif ($orphans === []) : ?>
     <section class="card">
