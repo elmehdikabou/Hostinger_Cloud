@@ -49,10 +49,21 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
         <div class="hint"><?= Fmt::e(Fmt::bytes($scan['database_bytes'])) ?> au total</div>
     </a>
 
-    <a class="card kpi <?= (int) $scan['orphan_count'] > 0 ? 'is-warning' : 'is-ok' ?>" href="<?= Fmt::url('/orphans') ?>">
-        <div class="value"><?= Fmt::e(Fmt::number($scan['orphan_count'])) ?></div>
+    <?php
+    /*
+     * Sans vue complete du serveur MySQL, l'outil ne voit que des bases deja
+     * utilisees : il ne peut donc structurellement pas en trouver une seule
+     * d'inutilisee. Afficher « 0 » se lirait « aucune n'existe » alors que
+     * cela veut dire « je ne peux pas savoir » — on affiche donc le doute.
+     */
+    $orphansKnown = (int) $scan['coverage_complete'] === 1 || (int) $scan['orphan_count'] > 0;
+    ?>
+    <a class="card kpi <?= !$orphansKnown ? '' : ((int) $scan['orphan_count'] > 0 ? 'is-warning' : 'is-ok') ?>" href="<?= Fmt::url('/orphans') ?>">
+        <div class="value"><?= $orphansKnown ? Fmt::e(Fmt::number($scan['orphan_count'])) : '?' ?></div>
         <div class="label">Bases orphelines</div>
-        <div class="hint"><?= $orphanBytes > 0 ? Fmt::e(Fmt::bytes($orphanBytes)) . ' récupérables' : 'aucune base inutilisée' ?></div>
+        <div class="hint"><?= $orphansKnown
+            ? ($orphanBytes > 0 ? Fmt::e(Fmt::bytes($orphanBytes)) . ' récupérables' : 'aucune base inutilisée')
+            : 'indéterminé — accès MySQL partiel' ?></div>
     </a>
 
     <a class="card kpi <?= $counts['critical'] > 0 ? 'is-critical' : 'is-ok' ?>" href="<?= Fmt::url('/findings?severity=critical') ?>">

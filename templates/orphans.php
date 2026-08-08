@@ -31,11 +31,48 @@ foreach ($orphans as $orphan) {
     </div>
 <?php endif ?>
 
-<?php if ($orphans === []) : ?>
+<?php if ($orphans === [] && (int) $scan['coverage_complete'] !== 1) : ?>
+    <?php
+    /*
+     * Le cas le plus trompeur de tout l'outil. Sans acces MySQL global, les
+     * seules bases visibles sont celles rattachees aux comptes lus dans les
+     * sites — donc des bases utilisees. Zero orpheline n'y est pas un
+     * resultat : c'est l'unique resultat possible. Annoncer « aucune » serait
+     * mensonger.
+     */
+    ?>
+    <section class="card">
+        <div class="empty-state">
+            <h2>Impossible à déterminer</h2>
+            <p>Ce n'est pas qu'il n'y en a aucune : l'outil ne peut pas le savoir dans l'état actuel.</p>
+        </div>
+
+        <div class="notice warning">
+            <strong>Pourquoi</strong>
+            Un utilisateur MySQL ne voit que les bases auxquelles il est rattaché. Faute d'accès
+            global, seuls les comptes lus dans tes sites ont été interrogés — donc uniquement des
+            bases déjà utilisées. Une base qu'aucun site n'utilise reste invisible, et c'est
+            précisément celle qu'on cherche.
+        </div>
+
+        <h2>Obtenir la vue complète</h2>
+        <ol class="actions">
+            <li>hPanel &gt; Bases de données MySQL &gt; crée un utilisateur, puis rattache-le à
+                <strong>toutes</strong> tes bases.</li>
+            <li>Renseigne-le dans <code>config/config.php</code>, section <code>mysql</code> :
+                <code class="command">'admin_user' =&gt; 'uXXXXXXXXX_inventaire',
+'admin_password' =&gt; '…',</code>
+            </li>
+            <li>Relance le relevé :
+                <code class="command">php bin/hspace scan</code>
+            </li>
+        </ol>
+    </section>
+<?php elseif ($orphans === []) : ?>
     <section class="card">
         <div class="empty-state">
             <h2>Aucune base orpheline</h2>
-            <p>Chaque base visible est utilisée par au moins un site. Rien à nettoyer de ce côté.</p>
+            <p>Chaque base du serveur est utilisée par au moins un site. Rien à nettoyer de ce côté.</p>
         </div>
     </section>
 <?php else : ?>

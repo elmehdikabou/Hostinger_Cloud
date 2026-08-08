@@ -218,6 +218,7 @@ qu'une base invisible n'est pas une base absente.
 | `doctor` | Vérifie configuration, connexion, arborescence et accès MySQL |
 | `scan` | Lance un relevé complet et l'enregistre |
 | `sites` | Liste les sites et leurs bases |
+| `databases` | Liste toutes les bases et les sites qui les utilisent |
 | `orphans` | Liste les bases qu'aucun site n'utilise |
 | `findings` | Constats du dernier relevé (`--critical`, `--warning`) |
 | `history` | Relevés enregistrés |

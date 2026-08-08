@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HostingerSpace\Console;
 
+use HostingerSpace\Console\Command\DatabasesCommand;
 use HostingerSpace\Console\Command\DemoCommand;
 use HostingerSpace\Console\Command\DiffCommand;
 use HostingerSpace\Console\Command\DoctorCommand;
@@ -30,6 +31,7 @@ final class Application
             new DoctorCommand(),
             new ScanCommand(),
             new SitesCommand(),
+            new DatabasesCommand(),
             new OrphansCommand(),
             new FindingsCommand(),
             new HistoryCommand(),
