@@ -188,6 +188,40 @@ test('Une configuration anterieure a la cle retrouve quand meme la liste', funct
     rmdir($racine);
 });
 
+test('La liste declaree complete les mesures au lieu de les ecraser', function (): void {
+    /*
+     * Le cas reel : 13 bases sont ouvertes par les acces lus dans les sites et
+     * pesent 2,7 Go a elles seules ; hPanel en declare 45. Si la fusion
+     * repartait de noms nus, ces 2,7 Go — les seules mesures disponibles —
+     * disparaitraient, et l'espace occupe redeviendrait inconnu alors qu'il
+     * etait connu.
+     */
+    $mesuree = new DatabaseInfo('u1_boutique', sizeBytes: 2_700_000_000, tableCount: 48);
+    $mesuree->measured = true;
+    $mesuree->addSource('wp-config.php');
+
+    $inventaire = new DatabaseInventory(['u1_boutique' => $mesuree], probes: [], complete: false);
+
+    $fusionne = $inventaire->withDeclared(['u1_boutique', 'u1_t22AF', 'u1_Ceab4']);
+
+    assertCount(3, $fusionne->databases);
+    assertSame(2_700_000_000, $fusionne->get('u1_boutique')?->sizeBytes);
+    assertSame(48, $fusionne->get('u1_boutique')?->tableCount);
+    assertFalse($fusionne->get('u1_boutique')?->unmeasured());
+
+    // La base mesuree porte desormais ses deux origines, la declaration
+    // n'effaçant pas la trace de l'acces qui l'avait ouverte.
+    assertSame(['wp-config.php', 'liste hPanel'], $fusionne->get('u1_boutique')?->discoveredVia);
+
+    // Les nouvelles arrivent sans mesure, et le disent.
+    assertTrue($fusionne->get('u1_t22AF')?->unmeasured());
+    assertSame(2, $fusionne->unmeasuredCount());
+
+    // Le total reste celui des bases reellement pesees.
+    assertSame(2_700_000_000, $fusionne->totalSize());
+    assertTrue($fusionne->complete);
+});
+
 test('Une liste declaree suffit meme sans le moindre acces MySQL', function (): void {
     $inventaire = new DatabaseInventory(
         ['u1_alpha' => new DatabaseInfo('u1_alpha')],

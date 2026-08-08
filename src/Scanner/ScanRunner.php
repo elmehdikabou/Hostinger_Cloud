@@ -163,24 +163,14 @@ final class ScanRunner
             return $inventory;
         }
 
-        $databases = $inventory->databases;
-        $added = 0;
-
-        foreach ($declared as $name) {
-            if (!isset($databases[$name])) {
-                $databases[$name] = new DatabaseInfo($name);
-                $added++;
-            }
-
-            $databases[$name]->addSource('liste hPanel');
-        }
-
-        ksort($databases, SORT_NATURAL | SORT_FLAG_CASE);
+        $before = count($inventory->databases);
+        $merged = $inventory->withDeclared($declared);
+        $added = count($merged->databases) - $before;
 
         ($this->report)('mysql', count($declared) . ' base(s) declaree(s) depuis hPanel'
             . ($added > 0 ? ", dont {$added} qu'aucun acces MySQL ne voyait" : ''));
 
-        return new DatabaseInventory($databases, $inventory->probes, complete: true, declared: true);
+        return $merged;
     }
 
     /**

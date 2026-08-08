@@ -34,6 +34,34 @@ final readonly class DatabaseInventory
         return count(array_filter($this->databases, static fn (DatabaseInfo $d): bool => $d->unmeasured()));
     }
 
+    /**
+     * Ajoute les bases declarees a la main, sans toucher a ce qui est mesure.
+     *
+     * Les deux sources se completent au lieu de se remplacer : les bases
+     * ouvertes par MySQL gardent leur taille et leur date de derniere
+     * ecriture, celles connues du seul hPanel arrivent avec leur nom pour
+     * tout bagage. Ecraser les premieres ferait perdre les seules mesures
+     * dont on dispose — et l'espace reellement occupe redeviendrait inconnu.
+     *
+     * @param array<int,string> $names
+     */
+    public function withDeclared(array $names): self
+    {
+        $databases = $this->databases;
+
+        foreach ($names as $name) {
+            $databases[$name] ??= new DatabaseInfo($name);
+            $databases[$name]->addSource('liste hPanel');
+        }
+
+        ksort($databases, SORT_NATURAL | SORT_FLAG_CASE);
+
+        // La liste vient de hPanel : elle est exhaustive, meme si la plupart
+        // de ces bases n'ont pas pu etre ouvertes. C'est le rattachement aux
+        // sites qui decide d'une orpheline, pas le poids.
+        return new self($databases, $this->probes, complete: true, declared: true);
+    }
+
     public static function empty(): self
     {
         return new self([], [], false);

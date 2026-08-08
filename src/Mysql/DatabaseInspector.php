@@ -226,13 +226,33 @@ final class DatabaseInspector
      * Un acces portant « ON *.* » voit tout le serveur : la liste des bases
      * est alors exhaustive, et une orpheline en est vraiment une.
      */
+    /**
+     * L'acces voit-il vraiment toutes les bases du serveur ?
+     *
+     * La portee « ON *.* » ne suffit pas a le dire. Tout utilisateur MySQL,
+     * meme le plus limite, porte « GRANT USAGE ON *.* » : USAGE est le
+     * privilege vide, celui qui n'autorise que la connexion.
+     *
+     * S'en contenter faisait declarer « inventaire complet » a un compte
+     * mutualise qui ne voyait que 13 bases sur 45 — et l'outil annoncait
+     * alors « 0 orpheline » avec assurance, alors que 32 bases inutilisees
+     * lui etaient simplement invisibles. C'etait le mensonge le plus couteux
+     * de l'outil : il faisait conclure qu'il n'y avait rien a nettoyer.
+     *
+     * Il faut donc un privilege qui permette reellement d'enumerer les
+     * schemas : ALL PRIVILEGES, SELECT ou SHOW DATABASES, a la portee globale.
+     */
     private function grantsAllDatabases(MysqlGateway $gateway): bool
     {
         try {
             foreach ($gateway->query('SHOW GRANTS') as $row) {
                 $grant = (string) (reset($row) ?: '');
 
-                if (preg_match('/\bON\s+\*\.\*\s+TO\b/i', $grant) === 1) {
+                if (preg_match('/^GRANT\s+(.+?)\s+ON\s+\*\.\*\s+TO\b/i', $grant, $matches) !== 1) {
+                    continue;
+                }
+
+                if (preg_match('/\b(ALL PRIVILEGES|SELECT|SHOW DATABASES)\b/i', $matches[1]) === 1) {
                     return true;
                 }
             }

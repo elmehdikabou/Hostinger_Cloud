@@ -143,6 +143,46 @@ test("Un acces ON *.* rend la couverture complete", function (): void {
     assertContains('Couverture complete', $inventory->coverageNote());
 });
 
+test("« GRANT USAGE ON *.* » ne rend pas la couverture complete", function (): void {
+    /*
+     * Le bug qui coutait le plus cher. USAGE est le privilege vide : tout
+     * utilisateur MySQL le porte, y compris celui d'un mutualise qui ne voit
+     * qu'une seule base. Ne regarder que la portee « *.* » faisait donc
+     * declarer l'inventaire complet a un compte qui voyait 13 bases sur 45 —
+     * et l'outil annoncait « 0 orpheline » avec assurance, faisant conclure
+     * qu'il n'y avait rien a nettoyer alors que 32 bases dormaient la.
+     */
+    $inspector = new DatabaseInspector(fn () => new FakeGateway('u1_a@localhost', [
+        'SHOW GRANTS' => [
+            ['Grants' => "GRANT USAGE ON *.* TO `u1_a`@`%`"],
+            ['Grants' => "GRANT ALL PRIVILEGES ON `u1_blog`.* TO `u1_a`@`%`"],
+        ],
+        'information_schema.SCHEMATA' => [['name' => 'u1_blog', 'charset' => null, 'collation' => null]],
+    ]));
+
+    $inventaire = $inspector->inspect([new MysqlCredential('u1_a', 'x')]);
+
+    assertFalse($inventaire->complete, 'USAGE n\'autorise que la connexion, rien d\'autre');
+    assertContains('Couverture partielle', $inventaire->coverageNote());
+});
+
+test("Un SELECT global suffit a enumerer les bases", function (): void {
+    // A l'inverse, un privilege qui permet vraiment de lire les schemas rend
+    // bien la vue complete : refuser celui-la priverait d'une reponse fiable
+    // les comptes qui l'ont.
+    foreach (['SELECT', 'SHOW DATABASES', 'SELECT, INSERT, UPDATE'] as $privilege) {
+        $inspector = new DatabaseInspector(fn () => new FakeGateway('lecteur@localhost', [
+            'SHOW GRANTS' => [['Grants' => "GRANT {$privilege} ON *.* TO `lecteur`@`%`"]],
+            'information_schema.SCHEMATA' => [['name' => 'u1_blog', 'charset' => null, 'collation' => null]],
+        ]));
+
+        assertTrue(
+            $inspector->inspect([new MysqlCredential('lecteur', 'x')])->complete,
+            "« {$privilege} ON *.* » permet d'enumerer les schemas"
+        );
+    }
+});
+
 test("Un acces limite a une base ne rend pas la couverture complete", function (): void {
     $inspector = new DatabaseInspector(fn () => new FakeGateway('u1_a@localhost', [
         'SHOW GRANTS' => [['Grants' => "GRANT ALL PRIVILEGES ON `u1_blog`.* TO `u1_a`@`localhost`"]],
