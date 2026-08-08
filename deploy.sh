@@ -130,16 +130,21 @@ chmod 700 var 2>/dev/null || true
 # C'est voulu : elle publie la carte de l'hebergement.
 # ---------------------------------------------------------------------------
 
+NEEDS_PASSWORD=0
+
 step "Mot de passe de l'interface"
 
 if "$PHP" -r '$c = require "config/config.php"; exit(empty($c["web"]["password_hash"]) ? 1 : 0);'; then
     ok 'un mot de passe est deja defini'
 else
+    # Un echec ici n'interrompt pas l'installation : l'interface refuse de
+    # toute facon d'afficher quoi que ce soit sans mot de passe, il n'y a donc
+    # rien d'expose. Mieux vaut une installation complete a securiser qu'une
+    # installation a moitie faite.
     if [ -t 0 ]; then
-        "$PHP" bin/hspace passwd || fail 'Definition du mot de passe interrompue.'
+        "$PHP" bin/hspace passwd || NEEDS_PASSWORD=1
     else
-        bad "Aucun mot de passe defini, et pas de terminal pour le demander."
-        dim 'Lance ensuite : php bin/hspace passwd'
+        "$PHP" bin/hspace passwd --generate || NEEDS_PASSWORD=1
     fi
 fi
 
@@ -199,6 +204,13 @@ esac
 
 step 'Termine'
 say ''
+
+if [ "$NEEDS_PASSWORD" = '1' ]; then
+    bad "Aucun mot de passe defini : l'interface refusera d'afficher les donnees."
+    dim "Lance : $PHP bin/hspace passwd --generate"
+    say ''
+fi
+
 say "  Ouvre ton sous-domaine dans un navigateur : la page de connexion"
 say "  doit apparaitre. Si tu vois les donnees sans mot de passe, arrete"
 say "  tout et lance : $PHP bin/hspace passwd"

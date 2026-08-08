@@ -85,6 +85,64 @@ final class Prompt
     }
 
     /**
+     * L'echo du terminal peut-il etre coupe ?
+     *
+     * Les hebergements mutualises desactivent souvent shell_exec, exec et
+     * proc_open par « disable_functions ». Sans aucune d'elles, impossible
+     * d'appeler stty, donc impossible de masquer une saisie — il faut le
+     * savoir avant de demander un mot de passe, pas au milieu.
+     */
+    public function canHideInput(): bool
+    {
+        if (!$this->isInteractive() || stripos(PHP_OS_FAMILY, 'win') === 0) {
+            return false;
+        }
+
+        return self::runCommand('stty -g 2>/dev/null') !== null;
+    }
+
+    /**
+     * Execute une commande avec la premiere fonction disponible.
+     *
+     * function_exists() renvoie false pour une fonction desactivee : c'est
+     * ce test qui manquait, et l'appel direct a shell_exec faisait tomber la
+     * commande sur une erreur fatale au lieu de se rabattre proprement.
+     */
+    private static function runCommand(string $command): ?string
+    {
+        if (function_exists('shell_exec')) {
+            $output = @shell_exec($command);
+
+            return is_string($output) && trim($output) !== '' ? $output : null;
+        }
+
+        if (function_exists('exec')) {
+            $lines = [];
+            @exec($command, $lines, $status);
+            $output = implode("\n", $lines);
+
+            return trim($output) !== '' ? $output : null;
+        }
+
+        if (function_exists('proc_open')) {
+            $process = @proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
+            if (!is_resource($process)) {
+                return null;
+            }
+
+            $output = (string) stream_get_contents($pipes[1]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($process);
+
+            return trim($output) !== '' ? $output : null;
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string,string> $choices Valeur => libelle.
      */
     public function choose(string $question, array $choices, string $default): string
@@ -139,25 +197,26 @@ final class Prompt
      */
     private function silenceTerminal(): callable
     {
+        $noop = static function (): void {
+        };
+
         if (!$this->isInteractive() || stripos(PHP_OS_FAMILY, 'win') === 0) {
-            return static function (): void {
-            };
+            return $noop;
         }
 
-        $previous = trim((string) @shell_exec('stty -g 2>/dev/null'));
+        $previous = trim((string) self::runCommand('stty -g 2>/dev/null'));
 
         if ($previous === '') {
-            return static function (): void {
-            };
+            return $noop;
         }
 
-        @shell_exec('stty -echo 2>/dev/null');
+        self::runCommand('stty -echo 2>/dev/null');
 
         $restored = false;
         $restore = static function () use ($previous, &$restored): void {
             if (!$restored) {
                 $restored = true;
-                @shell_exec('stty ' . escapeshellarg($previous) . ' 2>/dev/null');
+                self::runCommand('stty ' . escapeshellarg($previous) . ' 2>/dev/null');
             }
         };
 

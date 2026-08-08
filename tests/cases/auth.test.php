@@ -129,3 +129,50 @@ register_shutdown_function(static function () use ($account, $path): void {
         @unlink($file);
     }
 });
+
+// --- Mot de passe engendre, pour les serveurs sans stty --------------------
+
+test("Un mot de passe engendre protege reellement l'interface", function (): void {
+    // Regression : Hostinger desactive shell_exec par disable_functions, et
+    // le masquage de saisie s'appuyait dessus sans verifier qu'il existe.
+    // La commande tombait sur une erreur fatale au milieu du deploiement.
+    $directory = sys_get_temp_dir() . '/hspace-pw-' . bin2hex(random_bytes(6));
+    mkdir($directory, 0o775, true);
+    $target = $directory . '/config.php';
+    copy(dirname(__DIR__, 2) . '/config/config.example.php', $target);
+
+    $stream = fopen('php://memory', 'w+');
+    $code = (new HostingerSpace\Console\Command\PasswordCommand())->run(
+        ['--generate'],
+        new HostingerSpace\Console\Output($stream),
+        new HostingerSpace\Console\Context($target),
+    );
+
+    rewind($stream);
+    $shown = (string) stream_get_contents($stream);
+    fclose($stream);
+
+    assertSame(0, $code);
+
+    // Le mot de passe est affiche une fois, sur sa propre ligne.
+    assertTrue(
+        preg_match('/^\s+([A-Za-z0-9]{24})\s*$/m', $shown, $matches) === 1,
+        'le mot de passe engendre doit etre affiche'
+    );
+
+    $password = $matches[1];
+    $config = require $target;
+
+    assertTrue(password_verify($password, $config['web']['password_hash']));
+    assertFalse(password_verify($password . 'x', $config['web']['password_hash']));
+    assertFalse(str_contains($config['web']['password_hash'], $password), 'seul le condense est ecrit');
+
+    // Les caracteres qu'on confond en recopiant a l'oeil sont exclus : ce
+    // mot de passe sera lu a l'ecran puis colle ailleurs.
+    foreach (['0', 'O', '1', 'l', 'I'] as $ambigu) {
+        assertFalse(str_contains($password, $ambigu), "« {$ambigu} » se confond a la lecture");
+    }
+
+    unlink($target);
+    rmdir($directory);
+});
