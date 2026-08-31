@@ -178,6 +178,25 @@ final class KnownDatabases
         ], true);
     }
 
+    /**
+     * Date du dernier import, ou null si aucune liste n'est enregistree.
+     *
+     * Une liste collee il y a trois semaines decrit hPanel d'il y a trois
+     * semaines. Les bases supprimees depuis y figurent encore, et l'outil,
+     * qui ne les ouvre jamais, n'a aucun moyen de s'en apercevoir. Afficher
+     * l'age de la liste est le seul garde-fou honnete.
+     */
+    public static function importedAt(?string $path): ?int
+    {
+        if ($path === null || $path === '' || !is_file($path)) {
+            return null;
+        }
+
+        $time = @filemtime($path);
+
+        return $time === false ? null : $time;
+    }
+
     /** Lit la liste depuis un fichier, ou un tableau vide s'il est absent. */
     public static function fromFile(?string $path): array
     {

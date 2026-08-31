@@ -129,7 +129,7 @@ foreach ($measured as $orphan) {
             <div class="card kpi">
                 <div class="value"><?= $unknown ?></div>
                 <div class="label">Contenu inconnu</div>
-                <div class="hint">jamais ouvertes — à sauvegarder avant tout</div>
+                <div class="hint">nom repris de la liste, jamais vérifié</div>
             </div>
         <?php else : ?>
             <div class="card kpi">
@@ -159,7 +159,7 @@ foreach ($measured as $orphan) {
                         <td>
                             <a href="<?= Fmt::databaseUrl((string) $orphan['name']) ?>" class="mono"><?= Fmt::e((string) $orphan['name']) ?></a>
                             <?php if (!Fmt::measured($orphan)) : ?>
-                                <span class="badge neutral">non ouverte</span>
+                                <span class="badge neutral" title="Nom repris de la liste hPanel. Ni son contenu ni son existence n'ont été vérifiés.">non vérifiée</span>
                             <?php elseif ((int) $orphan['table_count'] === 0) : ?>
                                 <span class="badge neutral">vide</span>
                             <?php endif ?>

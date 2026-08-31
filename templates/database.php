@@ -37,10 +37,12 @@ $sources = ScanRepository::decode($database['discovered_via']);
 
         <?php if (!Fmt::measured($database)) : ?>
             <div class="notice">
-                <strong>Cette base n’a jamais pu être ouverte</strong>
-                Son nom vient de la liste déclarée depuis hPanel. Aucun accès MySQL ne l’a
-                atteinte, donc sa taille, ses tables et sa date de dernière écriture sont
-                inconnues — pas nulles. Sauvegarde-la avant d’en faire quoi que ce soit.
+                <strong>Cette base n’a jamais été vérifiée</strong>
+                Son nom vient de la liste collée depuis hPanel, et rien d’autre. Aucun accès MySQL
+                ne l’a atteinte : sa taille, ses tables et sa date de dernière écriture sont
+                inconnues — pas nulles — et <strong>son existence même n’est pas établie</strong>.
+                Si la liste date, elle peut nommer une base supprimée depuis. Vérifie-la dans
+                hPanel avant d’en faire quoi que ce soit.
             </div>
         <?php endif ?>
 

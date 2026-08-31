@@ -31,6 +31,8 @@ final readonly class DatabaseInventory
          * si le collage avait ete complet, tout ce que MySQL voit y figurerait.
          */
         public int $declaredGaps = 0,
+        /** Date du collage depuis hPanel, pour en montrer l'age. */
+        public ?int $declaredAt = null,
     ) {
     }
 
@@ -52,7 +54,7 @@ final readonly class DatabaseInventory
      * @param array<int,string> $names       Noms collees depuis hPanel.
      * @param array<int,string> $referenced  Bases que les sites declarent.
      */
-    public function withDeclared(array $names, array $referenced = []): self
+    public function withDeclared(array $names, array $referenced = [], ?int $declaredAt = null): self
     {
         $databases = $this->databases;
 
@@ -82,7 +84,14 @@ final readonly class DatabaseInventory
         // meme si la plupart de ces bases n'ont pas pu etre ouvertes — c'est lui
         // qui fait une orpheline, pas le poids. Les manques releves plus haut
         // disent, eux, jusqu'ou cette reponse porte.
-        return new self($databases, $this->probes, complete: true, declared: true, declaredGaps: $gaps);
+        return new self(
+            $databases,
+            $this->probes,
+            complete: true,
+            declared: true,
+            declaredGaps: $gaps,
+            declaredAt: $declaredAt,
+        );
     }
 
     public static function empty(): self
@@ -113,6 +122,30 @@ final readonly class DatabaseInventory
     }
 
     /**
+     * L'age de la liste declaree, quand il commence a compter.
+     *
+     * Une base supprimee depuis le collage y figure toujours, et l'outil ne
+     * l'ouvre jamais : rien ne peut l'en informer. Plus la liste vieillit,
+     * plus elle risque de decrire un hebergement qui n'existe plus.
+     */
+    private function declaredAge(): string
+    {
+        if ($this->declaredAt === null) {
+            return '';
+        }
+
+        $days = (int) floor((time() - $this->declaredAt) / 86_400);
+
+        if ($days < 7) {
+            return '';
+        }
+
+        return " Cette liste a ete collee il y a {$days} jours (" . date('d/m/Y', $this->declaredAt)
+            . ") : une base supprimee depuis y figure encore. Recolle-la depuis hPanel avant de "
+            . "supprimer quoi que ce soit.";
+    }
+
+    /**
      * Phrase a afficher en tete du rapport : sans acces global, une base
      * « orpheline » peut en realite etre invisible plutot qu'inutilisee, et
      * l'utilisateur doit le savoir avant de supprimer quoi que ce soit.
@@ -138,9 +171,11 @@ final readonly class DatabaseInventory
 
             return $note
                 . ($unmeasured > 0
-                    ? " {$unmeasured} base(s) n'ont pas pu etre ouvertes : leur taille et leur date de "
-                        . "derniere ecriture restent inconnues."
-                    : '');
+                    ? " {$unmeasured} base(s) n'ont pas pu etre ouvertes : ni leur taille, ni leur date de "
+                        . "derniere ecriture, ni meme leur existence n'ont ete verifiees — leur nom vient de "
+                        . "la liste, rien de plus."
+                    : '')
+                . $this->declaredAge();
         }
 
         if ($this->complete) {

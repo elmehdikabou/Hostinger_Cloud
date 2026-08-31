@@ -164,7 +164,11 @@ final class ScanRunner
         }
 
         $before = count($inventory->databases);
-        $merged = $inventory->withDeclared($declared, $this->referencedDatabases($sites));
+        $merged = $inventory->withDeclared(
+            $declared,
+            $this->referencedDatabases($sites),
+            KnownDatabases::importedAt($this->config->knownDatabasesFile()),
+        );
         $added = count($merged->databases) - $before;
 
         ($this->report)('mysql', count($declared) . ' base(s) declaree(s) depuis hPanel'

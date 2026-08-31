@@ -192,10 +192,11 @@ test('Une base jamais ouverte ne se presente jamais comme vide', function () use
         );
     }
 
-    // Le doute est dit, pas seulement tu.
-    assertContains('non ouverte', $noyau->handle('/orphans', [])->body);
+    // Le doute est dit, pas seulement tu — et il porte sur l'existence meme,
+    // pas seulement sur la taille : une liste peut nommer une base supprimee.
+    assertContains('non vérifiée', $noyau->handle('/orphans', [])->body);
     assertContains('?', $noyau->handle('/databases', [])->body);
-    assertContains('jamais pu être ouverte', $noyau->handle('/database', ['name' => 'u1_t22AF'])->body);
+    assertContains('existence même n’est pas établie', $noyau->handle('/database', ['name' => 'u1_t22AF'])->body);
 
     // Et le tableau de bord ne dit pas « aucune base inutilisee » sous un
     // compte d'orphelines non nul.

@@ -117,6 +117,14 @@ final class OrphansCommand implements Command
             $out->line();
         }
 
+        if ($unmeasured > 0) {
+            // Une base jamais ouverte n'est pas seulement de taille inconnue :
+            // rien ne prouve qu'elle existe encore. La liste peut dater.
+            $out->warn("{$unmeasured} de ces bases ne sont connues que par la liste collee : leur existence"
+                . " meme n'a pas ete verifiee.");
+            $out->line();
+        }
+
         $out->line('  Avant de supprimer quoi que ce soit :');
         $out->line();
         $out->line('   1. Sauvegarder :');

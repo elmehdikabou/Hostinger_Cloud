@@ -55,7 +55,7 @@ foreach ($databases as $database) {
                     <td>
                         <a href="<?= Fmt::databaseUrl((string) $database['name']) ?>" class="mono"><?= Fmt::e((string) $database['name']) ?></a>
                         <?php if (!Fmt::measured($database)) : ?>
-                            <span class="badge neutral">non ouverte</span>
+                            <span class="badge neutral" title="Nom repris de la liste hPanel. Ni son contenu ni son existence n'ont été vérifiés.">non vérifiée</span>
                         <?php elseif ((int) $database['table_count'] === 0) : ?>
                             <span class="badge neutral">vide</span>
                         <?php endif ?>

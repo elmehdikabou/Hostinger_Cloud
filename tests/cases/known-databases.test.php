@@ -369,3 +369,32 @@ test('Une base declaree par un site compte comme preuve de manque', function ():
     // Ni MySQL ni site : rien a signaler.
     assertSame(0, $sansMysql->withDeclared(['u1_t22AF'])->declaredGaps);
 });
+
+test('Une liste qui date le dit, au lieu de passer pour un etat des lieux', function (): void {
+    /*
+     * Signale par l'utilisateur : « il y a des bases qui n'existent pas sur
+     * Hostinger mais le scan les a detectees ». Il avait raison, et la cause
+     * n'est pas dans la lecture — c'est que l'outil croit la liste sur parole.
+     * Ces bases-la ne sont jamais ouvertes : une base supprimee depuis le
+     * collage y figure encore, et rien ne peut l'en informer.
+     *
+     * Faute de pouvoir verifier, il reste a dater. Une liste de trois semaines
+     * decrit hPanel d'il y a trois semaines, et doit le dire avant qu'on
+     * supprime sur sa foi.
+     */
+    $inventaire = new DatabaseInventory([], probes: [], complete: false);
+
+    $recent = $inventaire->withDeclared(['u1_alpha'], declaredAt: time() - 2 * 86_400);
+    assertFalse(str_contains($recent->coverageNote(), 'jours'), "une liste fraiche n'a pas a se justifier");
+
+    $ancien = $inventaire->withDeclared(['u1_alpha'], declaredAt: time() - 23 * 86_400);
+    assertContains('collee il y a 23 jours', $ancien->coverageNote());
+    assertContains('supprimee depuis y figure encore', $ancien->coverageNote());
+
+    // Et le doute porte sur l'existence, pas seulement sur la taille.
+    assertContains('ni meme leur existence', $ancien->coverageNote());
+
+    // Sans liste enregistree, aucune date a annoncer.
+    assertSame(null, KnownDatabases::importedAt('/chemin/absent.txt'));
+    assertSame(null, KnownDatabases::importedAt(null));
+});
