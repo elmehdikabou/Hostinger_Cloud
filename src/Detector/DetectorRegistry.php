@@ -7,6 +7,7 @@ namespace HostingerSpace\Detector;
 use HostingerSpace\Detector\App\AdminTool;
 use HostingerSpace\Detector\App\Drupal;
 use HostingerSpace\Detector\App\GenericPhp;
+use HostingerSpace\Detector\App\Dolibarr;
 use HostingerSpace\Detector\App\Joomla;
 use HostingerSpace\Detector\App\Laravel;
 use HostingerSpace\Detector\App\Magento;
@@ -46,6 +47,7 @@ final class DetectorRegistry
             new Laravel(),
             new Symfony(),
             new Joomla(),
+            new Dolibarr(),
             new PrestaShop(),
             new Drupal(),
             new Magento(),

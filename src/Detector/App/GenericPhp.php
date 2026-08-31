@@ -179,6 +179,26 @@ final class GenericPhp implements Detector
             }
         }
 
+        /*
+         * A defaut d'un nom exact, un nom prefixe : « $dolibarr_main_db_name »,
+         * « $cfg_db_name », « $app_database ». Les applications maison en sont
+         * pleines, et chacune inventerait sinon une orpheline.
+         *
+         * Se tromper dans ce sens est sans danger : une base rattachee a tort
+         * n'est simplement pas proposee au nettoyage. Se tromper dans l'autre
+         * fait declarer inutilisee une base en service — la seule erreur de cet
+         * outil qui detruise des donnees. On penche donc du cote prudent.
+         */
+        foreach ($keys as $key) {
+            foreach ($pools as $pool) {
+                foreach ($pool as $candidate => $value) {
+                    if (str_ends_with(strtolower($candidate), '_' . strtolower($key)) && trim($value) !== '') {
+                        return $value;
+                    }
+                }
+            }
+        }
+
         return null;
     }
 }

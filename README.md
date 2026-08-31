@@ -324,7 +324,7 @@ tourne donc aussi bien depuis Windows que déposé sur l'hébergement lui-même
 (`mode => 'local'`).
 
 **Les technologies reconnues** : WordPress, Laravel, Symfony, Joomla,
-PrestaShop, Drupal, Magento, PHP sur mesure, sites statiques, pages de parcage,
+PrestaShop, Drupal, Magento, Dolibarr, PHP sur mesure, sites statiques, pages de parcage,
 dossiers vides, phpMyAdmin et Adminer. Chacune rend sa version et ses
 identifiants de base.
 
