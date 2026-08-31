@@ -219,6 +219,20 @@ final class ScanCommand implements Command
 
         $out->table(['Base', 'Tables', 'Taille', 'Derniere ecriture'], $rows, [1 => false, 2 => true]);
         $out->line();
+
+        // Un tableau de « ? » n'est pas une liste d'orphelines etablies : ce
+        // sont des noms repris d'un collage, que rien n'a confirme.
+        $unknown = count(array_filter(
+            $result->analysis->orphans,
+            static fn (string $n): bool => !($result->inventory->get($n)?->measured ?? false),
+        ));
+
+        if ($unknown > 0) {
+            $out->dim("  {$unknown} de ces bases ne sont connues que par la liste collee : leur");
+            $out->dim('  existence n\'est pas etablie. Detail : php bin/hspace orphans');
+            $out->line();
+        }
+
         $out->dim('  Sauvegarde avant toute suppression :');
         $out->dim('    mysqldump -u UTILISATEUR -p NOM_BASE > ~/sauvegarde-NOM_BASE.sql');
     }

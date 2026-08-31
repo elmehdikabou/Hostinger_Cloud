@@ -71,7 +71,15 @@ final class OrphansCommand implements Command
             return 0;
         }
 
+        /*
+         * Deux populations de fiabilite opposee sous un seul tableau. Une base
+         * que MySQL a ouverte et qu'aucun site ne declare est etablie : on peut
+         * agir dessus. Un nom repris d'une liste collee n'est qu'une piste — la
+         * base peut ne plus exister, ou servir a un site que le scan n'a pas su
+         * lire. Les melanger noyait les quelques certitudes sous les doutes.
+         */
         $rows = [];
+        $pistes = [];
         $total = 0;
         $unmeasured = 0;
 
@@ -81,32 +89,47 @@ final class OrphansCommand implements Command
             // sans importance, alors qu'elle peut etre pleine.
             $measured = (int) ($database['measured'] ?? 1) === 1;
 
-            if ($measured) {
-                $total += (int) $database['size_bytes'];
-            } else {
+            if (!$measured) {
                 $unmeasured++;
+                $pistes[] = (string) $database['name'];
+
+                continue;
             }
+
+            $total += (int) $database['size_bytes'];
 
             $rows[] = [
                 $database['name'],
-                $measured ? (string) $database['table_count'] : '?',
-                $measured ? Output::bytes((int) $database['size_bytes']) : '?',
-                $measured
-                    ? Output::since($database['updated_at'] === null ? null : (int) $database['updated_at'])
-                    : '?',
+                (string) $database['table_count'],
+                Output::bytes((int) $database['size_bytes']),
+                Output::since($database['updated_at'] === null ? null : (int) $database['updated_at']),
             ];
         }
 
-        $out->table(['Base', 'Tables', 'Taille', 'Derniere ecriture'], $rows, [1 => true, 2 => true]);
-
+        $out->line();
+        $out->line('  Orphelines verifiees — ouvertes par MySQL, declarees par aucun site :');
         $out->line();
 
-        if ($unmeasured === count($orphans)) {
-            $out->info("Aucune de ces bases n'a pu etre ouverte : leur taille reste inconnue.");
-            $out->dim('  Le rattachement, lui, est etabli : aucun site ne les declare.');
+        if ($rows === []) {
+            $out->dim('    Aucune. Les bases que l\'outil a pu ouvrir servent toutes a un site.');
         } else {
-            $out->info('Espace potentiellement recuperable : ' . Output::bytes($total)
-                . ($unmeasured > 0 ? ", plus {$unmeasured} base(s) de taille inconnue" : ''));
+            $out->table(['Base', 'Tables', 'Taille', 'Derniere ecriture'], $rows, [1 => true, 2 => true]);
+            $out->line();
+            $out->info('Espace recuperable : ' . Output::bytes($total));
+        }
+
+        if ($pistes !== []) {
+            $out->line();
+            $out->line('  Pistes a confirmer — ' . count($pistes) . ' nom(s) repris de la liste collee,');
+            $out->line('  jamais atteints par MySQL. Leur existence n\'est pas etablie :');
+            $out->line();
+
+            foreach (array_chunk($pistes, 2) as $paire) {
+                $out->dim('    ' . implode('   ', array_map(
+                    static fn (string $n): string => str_pad($n, 28),
+                    $paire
+                )));
+            }
         }
 
         $out->line();
@@ -114,14 +137,6 @@ final class OrphansCommand implements Command
         if ((int) $scan['coverage_complete'] !== 1) {
             $out->warn("Inventaire partiel : cette liste peut contenir des faux positifs.");
             $out->dim('  ' . $scan['coverage_note']);
-            $out->line();
-        }
-
-        if ($unmeasured > 0) {
-            // Une base jamais ouverte n'est pas seulement de taille inconnue :
-            // rien ne prouve qu'elle existe encore. La liste peut dater.
-            $out->warn("{$unmeasured} de ces bases ne sont connues que par la liste collee : leur existence"
-                . " meme n'a pas ete verifiee.");
             $out->line();
         }
 

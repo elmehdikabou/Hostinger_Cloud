@@ -114,9 +114,22 @@ foreach ($measured as $orphan) {
     </section>
 <?php else : ?>
     <div class="grid grid-kpi">
-        <div class="card kpi is-warning">
-            <div class="value"><?= count($orphans) ?></div>
-            <div class="label">Bases sans site</div>
+        <?php
+        /*
+         * Deux populations de fiabilite opposee vivaient sous un seul chiffre.
+         * Une base que MySQL a ouverte et qu'aucun site ne declare est une
+         * orpheline etablie : on peut agir dessus. Un nom repris d'une liste
+         * collee n'est qu'une piste — la base peut ne plus exister, ou etre
+         * utilisee par un site que le scan n'a pas su lire.
+         *
+         * Les additionner donnait « 43 bases sans site » en gros et en tete,
+         * soit le chiffre le moins sur de la page presente comme le plus sur.
+         */
+        ?>
+        <div class="card kpi <?= $measured === [] ? '' : 'is-warning' ?>">
+            <div class="value"><?= count($measured) ?></div>
+            <div class="label">Orphelines vérifiées</div>
+            <div class="hint">ouvertes par MySQL, utilisées par aucun site</div>
         </div>
         <div class="card kpi">
             <div class="value"><?= $measured === [] ? '?' : Fmt::e(Fmt::bytes($total)) ?></div>
@@ -128,8 +141,8 @@ foreach ($measured as $orphan) {
         <?php if ($unknown > 0) : ?>
             <div class="card kpi">
                 <div class="value"><?= $unknown ?></div>
-                <div class="label">Contenu inconnu</div>
-                <div class="hint">nom repris de la liste, jamais vérifié</div>
+                <div class="label">Pistes à confirmer</div>
+                <div class="hint">noms repris de la liste, jamais vérifiés</div>
             </div>
         <?php else : ?>
             <div class="card kpi">
@@ -140,7 +153,26 @@ foreach ($measured as $orphan) {
         <?php endif ?>
     </div>
 
+    <?php
+    /*
+     * Deux tableaux plutot qu'un. Melangees, 43 pistes non verifiees noyaient
+     * les quelques orphelines etablies — les seules sur lesquelles on puisse
+     * agir. L'ordre compte : ce qui est sur d'abord, ce qui reste a confirmer
+     * ensuite, et jamais l'inverse.
+     */
+    ?>
     <section class="card">
+        <h2>Orphelines vérifiées</h2>
+
+        <?php if ($measured === []) : ?>
+            <p class="muted">
+                Aucune. Les bases que l'outil a pu ouvrir sont toutes utilisées par au moins un
+                site — celles ci-dessous ne sont connues que par leur nom.
+            </p>
+        <?php else : ?>
+        <p class="subtitle">
+            Ouvertes par MySQL, donc bien réelles, et déclarées par aucun site.
+        </p>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -154,7 +186,7 @@ foreach ($measured as $orphan) {
                 </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($orphans as $orphan) : ?>
+                <?php foreach ($measured as $orphan) : ?>
                     <tr>
                         <td>
                             <a href="<?= Fmt::databaseUrl((string) $orphan['name']) ?>" class="mono"><?= Fmt::e((string) $orphan['name']) ?></a>
@@ -174,7 +206,35 @@ foreach ($measured as $orphan) {
                 </tbody>
             </table>
         </div>
+        <?php endif ?>
     </section>
+
+    <?php if ($unknown > 0) : ?>
+        <section class="card">
+            <h2>Pistes à confirmer</h2>
+            <p class="subtitle">
+                Ces noms viennent de la liste collée depuis hPanel, et de rien d'autre. Aucun accès
+                MySQL ne les a atteints : leur existence n'est pas établie, et un site que le scan
+                n'a pas su lire pourrait très bien s'en servir.
+                <strong>Ne supprime rien d'ici sans l'avoir vérifié dans hPanel.</strong>
+            </p>
+            <div class="table-wrap">
+                <table>
+                    <tbody>
+                    <?php foreach ($orphans as $orphan) : ?>
+                        <?php if (Fmt::measured($orphan)) { continue; } ?>
+                        <tr>
+                            <td>
+                                <a href="<?= Fmt::databaseUrl((string) $orphan['name']) ?>" class="mono"><?= Fmt::e((string) $orphan['name']) ?></a>
+                            </td>
+                            <td class="muted">nom déclaré, jamais vérifié</td>
+                        </tr>
+                    <?php endforeach ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    <?php endif ?>
 
     <section class="card">
         <h2>Marche à suivre</h2>
