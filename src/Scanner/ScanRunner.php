@@ -122,7 +122,7 @@ final class ScanRunner
         if ($credentials === []) {
             // Meme sans le moindre acces MySQL, la liste declaree depuis
             // hPanel suffit a rattacher les bases aux sites.
-            $inventory = $this->mergeDeclaredList(DatabaseInventory::empty());
+            $inventory = $this->mergeDeclaredList(DatabaseInventory::empty(), $sites);
 
             if ($inventory->databases === []) {
                 $this->errors[] = "Aucun acces MySQL et aucune liste declaree : aucune base n'a pu etre listee. " .
@@ -139,7 +139,7 @@ final class ScanRunner
             $this->errors[] = "Acces MySQL refuse pour {$failure->label} (source : {$failure->source}) : {$failure->error}";
         }
 
-        $inventory = $this->mergeDeclaredList($inventory);
+        $inventory = $this->mergeDeclaredList($inventory, $sites);
 
         ($this->report)('mysql', count($inventory->databases) . ' base(s) connue(s)');
 
@@ -155,7 +155,7 @@ final class ScanRunner
      * personne ne demande pas de l'ouvrir : il suffit de connaitre son nom.
      * La liste collee depuis hPanel rend donc la question decidable.
      */
-    private function mergeDeclaredList(DatabaseInventory $inventory): DatabaseInventory
+    private function mergeDeclaredList(DatabaseInventory $inventory, array $sites = []): DatabaseInventory
     {
         $declared = KnownDatabases::fromFile($this->config->knownDatabasesFile());
 
@@ -164,13 +164,42 @@ final class ScanRunner
         }
 
         $before = count($inventory->databases);
-        $merged = $inventory->withDeclared($declared);
+        $merged = $inventory->withDeclared($declared, $this->referencedDatabases($sites));
         $added = count($merged->databases) - $before;
 
         ($this->report)('mysql', count($declared) . ' base(s) declaree(s) depuis hPanel'
             . ($added > 0 ? ", dont {$added} qu'aucun acces MySQL ne voyait" : ''));
 
         return $merged;
+    }
+
+    /**
+     * Les bases que les sites declarent dans leur configuration.
+     *
+     * Un site qui pointe vers une base atteste son existence aussi surement
+     * que MySQL — et quand l'acces a cette base echoue, il en est la seule
+     * trace. Sans cela, une liste a laquelle manquent precisement les bases en
+     * service passerait pour complete.
+     *
+     * @param array<int,Site> $sites
+     *
+     * @return array<int,string>
+     */
+    private function referencedDatabases(array $sites): array
+    {
+        $names = [];
+
+        foreach ($sites as $site) {
+            foreach ($site->discovered as $discovered) {
+                // Une base hebergee ailleurs n'a rien a faire dans la liste
+                // hPanel : son absence ne prouve aucun manque.
+                if ($discovered->named() && $discovered->isLocal()) {
+                    $names[] = $discovered->database;
+                }
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     /**

@@ -151,7 +151,7 @@ final class ScanCommand implements Command
         }
 
         $out->line();
-        $out->warn("Ta liste est incomplete : {$gaps} base(s) trouvees par MySQL n'y figurent pas.");
+        $out->warn("Ta liste est incomplete : {$gaps} base(s) existent qui n'y figurent pas.");
         $out->line();
         $out->line('  Le tableau de hPanel se pagine — le collage s\'est probablement arrete');
         $out->line('  au premier ecran. D\'autres bases peuvent manquer, et avec elles');

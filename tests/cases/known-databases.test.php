@@ -332,7 +332,7 @@ test('Une liste que le serveur contredit est signalee comme incomplete', functio
     assertCount(57, $fusionne->databases);
     assertSame(12, $fusionne->declaredGaps);
     assertContains('Liste incomplete', $fusionne->coverageNote());
-    assertContains('12 base(s) que ta liste ne mentionne pas', $fusionne->coverageNote());
+    assertContains('12 base(s) existent que ta liste ne mentionne pas', $fusionne->coverageNote());
 
     // Les mesures des 13 bases vues survivent a la fusion.
     assertSame(12 * 207_000_000, $fusionne->totalSize());
@@ -343,4 +343,29 @@ test('Une liste que le serveur contredit est signalee comme incomplete', functio
 
     assertSame(0, $complete->declaredGaps);
     assertContains('Liste complete', $complete->coverageNote());
+});
+
+test('Une base declaree par un site compte comme preuve de manque', function (): void {
+    /*
+     * Le manque etait detecte par la seule vue MySQL. Or sur un mutualise,
+     * l'acces a ces bases echoue souvent — et c'est alors la configuration du
+     * site qui reste la seule trace de leur existence. Sans cela, une liste a
+     * laquelle manquent precisement les bases en service passait pour
+     * complete : le silence exact la ou l'alerte compte le plus.
+     */
+    $sansMysql = new DatabaseInventory([], probes: [], complete: false);
+
+    $fusionne = $sansMysql->withDeclared(
+        ['u1_t22AF', 'u1_Ceab4'],
+        referenced: ['u1_horsliste'],
+    );
+
+    assertSame(1, $fusionne->declaredGaps);
+    assertContains('1 base(s) existent que ta liste ne mentionne pas', $fusionne->coverageNote());
+
+    // Une base que la liste couvre deja ne compte pas deux fois.
+    assertSame(0, $sansMysql->withDeclared(['u1_t22AF'], referenced: ['u1_t22AF'])->declaredGaps);
+
+    // Ni MySQL ni site : rien a signaler.
+    assertSame(0, $sansMysql->withDeclared(['u1_t22AF'])->declaredGaps);
 });

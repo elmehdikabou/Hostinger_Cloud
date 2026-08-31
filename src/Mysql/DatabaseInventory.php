@@ -49,20 +49,27 @@ final readonly class DatabaseInventory
      * tout bagage. Ecraser les premieres ferait perdre les seules mesures
      * dont on dispose — et l'espace reellement occupe redeviendrait inconnu.
      *
-     * @param array<int,string> $names
+     * @param array<int,string> $names       Noms collees depuis hPanel.
+     * @param array<int,string> $referenced  Bases que les sites declarent.
      */
-    public function withDeclared(array $names): self
+    public function withDeclared(array $names, array $referenced = []): self
     {
         $databases = $this->databases;
 
         /*
-         * Une base que MySQL voit mais que la liste ignore prouve que le
-         * collage etait partiel — hPanel pagine, et on ne copie souvent que le
-         * premier ecran. L'outil ne peut pas deviner ce qui manque, mais il
+         * Une base absente de la liste mais dont on a par ailleurs la preuve
+         * qu'elle existe montre que le collage etait partiel — hPanel pagine,
+         * et on ne copie souvent que le premier ecran. Deux preuves valent :
+         * MySQL qui la voit, et un site qui la declare dans sa configuration.
+         *
+         * La seconde compte autant que la premiere : quand l'acces MySQL a ces
+         * bases echoue — le cas courant d'un mutualise — elle est meme la
+         * seule disponible. L'outil ne peut pas deviner ce qui manque, mais il
          * peut constater qu'il manque quelque chose, et le dire.
          */
         $declared = array_flip($names);
-        $gaps = count(array_diff_key($databases, $declared));
+        $known = $databases + array_flip(array_filter($referenced));
+        $gaps = count(array_diff_key($known, $declared));
 
         foreach ($names as $name) {
             $databases[$name] ??= new DatabaseInfo($name);
@@ -122,7 +129,8 @@ final readonly class DatabaseInventory
             $unmeasured = $this->unmeasuredCount();
 
             $note = $this->declaredGaps > 0
-                ? "Liste incomplete : MySQL a trouve {$this->declaredGaps} base(s) que ta liste ne mentionne pas. "
+                ? "Liste incomplete : {$this->declaredGaps} base(s) existent que ta liste ne mentionne pas "
+                    . "(vues par MySQL, ou declarees par un site). "
                     . "Le collage depuis hPanel n'etait donc pas entier — d'autres bases peuvent manquer, et avec elles "
                     . "d'autres orphelines. Celles trouvees ici restent reelles : aucun site ne les declare."
                 : "Liste complete : les " . count($this->databases) . " bases proviennent de la liste declaree depuis "

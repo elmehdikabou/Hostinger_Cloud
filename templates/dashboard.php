@@ -52,7 +52,8 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
     ?>
     <div class="notice warning">
         <strong>Ta liste de bases est incomplète</strong>
-        MySQL a trouvé <?= (int) $scan['declared_gaps'] ?> base(s) qui n'y figurent pas — le tableau de hPanel
+        <?= (int) $scan['declared_gaps'] ?> base(s) existent qui n'y figurent pas — vues par MySQL, ou
+        déclarées par un de tes sites. Le tableau de hPanel
         se pagine, et le collage s'est probablement arrêté au premier écran. Les orphelines
         ci-dessous sont réelles, mais il en manque peut-être d'autres. Recopie le tableau
         entier, puis <code>php bin/hspace import-databases</code> et <code>php bin/hspace scan</code>.
