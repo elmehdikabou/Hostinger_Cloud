@@ -25,6 +25,12 @@ final readonly class DatabaseInventory
          * d'une orpheline, pas le poids.
          */
         public bool $declared = false,
+        /**
+         * Nombre de bases que MySQL a trouvees mais que la liste declaree ne
+         * mentionne pas. C'est la preuve que cette liste n'est pas exhaustive :
+         * si le collage avait ete complet, tout ce que MySQL voit y figurerait.
+         */
+        public int $declaredGaps = 0,
     ) {
     }
 
@@ -49,6 +55,15 @@ final readonly class DatabaseInventory
     {
         $databases = $this->databases;
 
+        /*
+         * Une base que MySQL voit mais que la liste ignore prouve que le
+         * collage etait partiel — hPanel pagine, et on ne copie souvent que le
+         * premier ecran. L'outil ne peut pas deviner ce qui manque, mais il
+         * peut constater qu'il manque quelque chose, et le dire.
+         */
+        $declared = array_flip($names);
+        $gaps = count(array_diff_key($databases, $declared));
+
         foreach ($names as $name) {
             $databases[$name] ??= new DatabaseInfo($name);
             $databases[$name]->addSource('liste hPanel');
@@ -56,10 +71,11 @@ final readonly class DatabaseInventory
 
         ksort($databases, SORT_NATURAL | SORT_FLAG_CASE);
 
-        // La liste vient de hPanel : elle est exhaustive, meme si la plupart
-        // de ces bases n'ont pas pu etre ouvertes. C'est le rattachement aux
-        // sites qui decide d'une orpheline, pas le poids.
-        return new self($databases, $this->probes, complete: true, declared: true);
+        // La liste vient de hPanel : le rattachement aux sites devient decidable,
+        // meme si la plupart de ces bases n'ont pas pu etre ouvertes — c'est lui
+        // qui fait une orpheline, pas le poids. Les manques releves plus haut
+        // disent, eux, jusqu'ou cette reponse porte.
+        return new self($databases, $this->probes, complete: true, declared: true, declaredGaps: $gaps);
     }
 
     public static function empty(): self
@@ -105,10 +121,16 @@ final readonly class DatabaseInventory
         if ($this->declared) {
             $unmeasured = $this->unmeasuredCount();
 
-            return "Liste complete : les " . count($this->databases) . " bases proviennent de la liste declaree depuis hPanel, "
-                . "le rattachement aux sites est donc fiable."
+            $note = $this->declaredGaps > 0
+                ? "Liste incomplete : MySQL a trouve {$this->declaredGaps} base(s) que ta liste ne mentionne pas. "
+                    . "Le collage depuis hPanel n'etait donc pas entier — d'autres bases peuvent manquer, et avec elles "
+                    . "d'autres orphelines. Celles trouvees ici restent reelles : aucun site ne les declare."
+                : "Liste complete : les " . count($this->databases) . " bases proviennent de la liste declaree depuis "
+                    . "hPanel, le rattachement aux sites est donc fiable.";
+
+            return $note
                 . ($unmeasured > 0
-                    ? " En revanche, {$unmeasured} d'entre elles n'ont pas pu etre ouvertes : leur taille et leur date de "
+                    ? " {$unmeasured} base(s) n'ont pas pu etre ouvertes : leur taille et leur date de "
                         . "derniere ecriture restent inconnues."
                     : '');
         }

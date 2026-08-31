@@ -80,6 +80,7 @@ final class ScanCommand implements Command
         $out->dim('  ' . $result->inventory->coverageNote());
 
         $this->showMissingList($out, $result, $context);
+        $this->showDeclaredGaps($out, $result);
 
         foreach ($result->errors as $error) {
             $out->warn($error);
@@ -130,6 +131,37 @@ final class ScanCommand implements Command
         $out->line('      php bin/hspace scan');
         $out->line();
         $out->dim('  La liste sera lue dans ' . ($context->config()->knownDatabasesFile() ?? 'config/databases.txt') . '.');
+    }
+
+    /**
+     * Signale une liste declaree que le serveur contredit.
+     *
+     * hPanel pagine : on copie souvent le premier ecran en croyant tout
+     * prendre. L'outil ne peut pas deviner les noms manquants, mais si MySQL
+     * lui montre une base absente de la liste, il tient la preuve que le
+     * collage etait partiel. Se taire laisserait croire l'inventaire exhaustif
+     * alors qu'il manque peut-etre les orphelines les plus grosses.
+     */
+    private function showDeclaredGaps(Output $out, \HostingerSpace\Scanner\ScanResult $result): void
+    {
+        $gaps = $result->inventory->declaredGaps;
+
+        if ($gaps === 0) {
+            return;
+        }
+
+        $out->line();
+        $out->warn("Ta liste est incomplete : {$gaps} base(s) trouvees par MySQL n'y figurent pas.");
+        $out->line();
+        $out->line('  Le tableau de hPanel se pagine — le collage s\'est probablement arrete');
+        $out->line('  au premier ecran. D\'autres bases peuvent manquer, et avec elles');
+        $out->line('  d\'autres orphelines.');
+        $out->line();
+        $out->line('  Recopie le tableau entier, toutes pages comprises :');
+        $out->line();
+        $out->line('      php bin/hspace import-databases');
+        $out->line();
+        $out->dim('  Les orphelines ci-dessous restent reelles : aucun site ne les declare.');
     }
 
     /** @param array<int,\HostingerSpace\Model\Finding> $findings */

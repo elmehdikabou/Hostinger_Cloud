@@ -185,9 +185,12 @@ test('Une base de releves anterieure gagne la colonne « mesuree »', function (
      */
     $chemin = sys_get_temp_dir() . '/hspace-migr-' . bin2hex(random_bytes(6)) . '.sqlite';
 
-    // Un fichier au schema d'origine, sans la colonne, avec une ligne dedans.
+    // Un fichier au schema d'origine, sans les colonnes ajoutees depuis, avec
+    // des lignes dedans — comme la base de releves d'une installation en place.
     $pdo = new PDO('sqlite:' . $chemin);
+    $pdo->exec('CREATE TABLE scans (id INTEGER PRIMARY KEY, coverage_complete INTEGER NOT NULL DEFAULT 0)');
     $pdo->exec('CREATE TABLE databases (id INTEGER PRIMARY KEY, name TEXT NOT NULL, size_bytes INTEGER)');
+    $pdo->exec('INSERT INTO scans (coverage_complete) VALUES (1)');
     $pdo->exec("INSERT INTO databases (name, size_bytes) VALUES ('u1_ancienne', 4096)");
     $pdo->exec('PRAGMA user_version = 1');
     $pdo = null;
@@ -195,7 +198,9 @@ test('Une base de releves anterieure gagne la colonne « mesuree »', function (
     new Database($chemin);
 
     $relu = new PDO('sqlite:' . $chemin);
-    assertSame(2, (int) $relu->query('PRAGMA user_version')->fetchColumn());
+    assertSame(3, (int) $relu->query('PRAGMA user_version')->fetchColumn());
+    // Un releve d'avant la colonne ne prouve aucun manque : il en a zero.
+    assertSame(0, (int) $relu->query('SELECT declared_gaps FROM scans')->fetchColumn());
     assertSame(1, (int) $relu->query("SELECT measured FROM databases WHERE name = 'u1_ancienne'")->fetchColumn());
     assertSame(4096, (int) $relu->query("SELECT size_bytes FROM databases WHERE name = 'u1_ancienne'")->fetchColumn());
     $relu = null;

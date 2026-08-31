@@ -300,3 +300,47 @@ test('Un scan a couverture partielle reclame la liste au lieu de se taire', func
 
     $supprimer($racine);
 });
+
+test('Une liste que le serveur contredit est signalee comme incomplete', function (): void {
+    /*
+     * Le cas reel : 45 noms colles depuis hPanel, mais MySQL en montre 12
+     * autres qui n'y figurent pas. hPanel pagine, et le collage s'est arrete
+     * au premier ecran. L'outil ne peut pas deviner les noms manquants — il
+     * peut en revanche constater qu'il en manque, et cesser d'annoncer une
+     * liste complete. Sans quoi « 44 orphelines » se lit comme un total alors
+     * que c'est un minimum.
+     */
+    $vues = [];
+
+    foreach (range(1, 12) as $i) {
+        $info = new DatabaseInfo("u1_horsliste{$i}");
+        $info->measured = true;
+        $info->sizeBytes = 207_000_000;
+        $vues["u1_horsliste{$i}"] = $info;
+    }
+
+    $vues['u1_commune'] = new DatabaseInfo('u1_commune');
+    $vues['u1_commune']->measured = true;
+
+    $declarees = array_map(static fn (int $i): string => "u1_declaree{$i}", range(1, 44));
+    $declarees[] = 'u1_commune';
+
+    $fusionne = (new DatabaseInventory($vues, probes: [], complete: false))->withDeclared($declarees);
+
+    // 13 vues + 45 declarees, une seule en commun : 57 au total, comme sur le
+    // serveur reel.
+    assertCount(57, $fusionne->databases);
+    assertSame(12, $fusionne->declaredGaps);
+    assertContains('Liste incomplete', $fusionne->coverageNote());
+    assertContains('12 base(s) que ta liste ne mentionne pas', $fusionne->coverageNote());
+
+    // Les mesures des 13 bases vues survivent a la fusion.
+    assertSame(12 * 207_000_000, $fusionne->totalSize());
+
+    // Une liste qui couvre tout ce que MySQL voit ne declenche rien.
+    $complete = (new DatabaseInventory($vues, probes: [], complete: false))
+        ->withDeclared([...$declarees, ...array_keys($vues)]);
+
+    assertSame(0, $complete->declaredGaps);
+    assertContains('Liste complete', $complete->coverageNote());
+});

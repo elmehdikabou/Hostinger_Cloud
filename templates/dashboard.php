@@ -41,6 +41,23 @@ $maxDatabase = max(1, ...array_map(static fn (array $d): int => (int) $d['size_b
         <?= Fmt::e((string) $scan['coverage_note']) ?>
     </div>
 <?php endif ?>
+<?php if ((int) ($scan['declared_gaps'] ?? 0) > 0) : ?>
+    <?php
+    /*
+     * L'inventaire s'annonce complet parce qu'une liste a ete declaree, mais
+     * le serveur lui-meme la contredit : il montre des bases qu'elle ignore.
+     * Sans ce rappel, on lirait « 44 orphelines » comme un total, alors que
+     * c'est un minimum.
+     */
+    ?>
+    <div class="notice warning">
+        <strong>Ta liste de bases est incomplète</strong>
+        MySQL a trouvé <?= (int) $scan['declared_gaps'] ?> base(s) qui n'y figurent pas — le tableau de hPanel
+        se pagine, et le collage s'est probablement arrêté au premier écran. Les orphelines
+        ci-dessous sont réelles, mais il en manque peut-être d'autres. Recopie le tableau
+        entier, puis <code>php bin/hspace import-databases</code> et <code>php bin/hspace scan</code>.
+    </div>
+<?php endif ?>
 
 <div class="grid grid-kpi">
     <a class="card kpi" href="<?= Fmt::url('/sites') ?>">

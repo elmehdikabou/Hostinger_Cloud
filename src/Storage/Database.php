@@ -14,7 +14,7 @@ namespace HostingerSpace\Storage;
  */
 final class Database
 {
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 3;
 
     private \PDO $pdo;
 
@@ -127,6 +127,16 @@ final class Database
              * ligne qui fait supprimer une base pleine.
              */
             $this->pdo->exec('ALTER TABLE databases ADD COLUMN measured INTEGER NOT NULL DEFAULT 1');
+        }
+
+        if ($current < 3) {
+            /*
+             * Le nombre de bases que MySQL a vues mais que la liste declaree
+             * ignore. La note de couverture le dit deja, mais elle n'est
+             * affichee que sur un inventaire partiel — or c'est justement un
+             * inventaire annonce complet que ce constat vient contredire.
+             */
+            $this->pdo->exec('ALTER TABLE scans ADD COLUMN declared_gaps INTEGER NOT NULL DEFAULT 0');
         }
 
         $this->pdo->exec('PRAGMA user_version = ' . self::SCHEMA_VERSION);

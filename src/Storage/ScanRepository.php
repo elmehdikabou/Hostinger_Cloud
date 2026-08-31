@@ -20,15 +20,16 @@ final class ScanRepository
     {
         return (int) $this->database->transaction(function (Database $db) use ($result): int {
             $db->run(
-                'INSERT INTO scans (started_at, finished_at, host, mode, coverage_complete, coverage_note,
+                'INSERT INTO scans (started_at, finished_at, host, mode, declared_gaps, coverage_complete, coverage_note,
                     site_count, database_count, orphan_count, finding_count, disk_bytes, database_bytes, errors)
-                 VALUES (:started, :finished, :host, :mode, :complete, :note,
+                 VALUES (:started, :finished, :host, :mode, :gaps, :complete, :note,
                     :sites, :databases, :orphans, :findings, :disk, :dbbytes, :errors)',
                 [
                     ':started' => $result->startedAt,
                     ':finished' => $result->finishedAt,
                     ':host' => $result->host,
                     ':mode' => $result->mode,
+                    ':gaps' => $result->inventory->declaredGaps,
                     ':complete' => $result->inventory->complete ? 1 : 0,
                     ':note' => $result->inventory->coverageNote(),
                     ':sites' => count($result->sites),
