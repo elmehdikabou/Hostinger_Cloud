@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HostingerSpace\Console;
 
+use HostingerSpace\Console\Command\BackupsCommand;
 use HostingerSpace\Console\Command\DatabasesCommand;
 use HostingerSpace\Console\Command\DemoCommand;
 use HostingerSpace\Console\Command\DiffCommand;
@@ -33,6 +34,7 @@ final class Application
             new ScanCommand(),
             new SitesCommand(),
             new DatabasesCommand(),
+            new BackupsCommand(),
             new ImportDatabasesCommand(),
             new OrphansCommand(),
             new FindingsCommand(),

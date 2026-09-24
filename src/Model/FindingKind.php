@@ -24,6 +24,12 @@ enum FindingKind: string
     case DomainExpiring = 'domain_expiring';
     case PartialCoverage = 'partial_coverage';
 
+    /* Sauvegardes. */
+    case ExposedBackup = 'exposed_backup';
+    case NoBackup = 'no_backup';
+    case StaleBackup = 'stale_backup';
+    case TruncatedBackup = 'truncated_backup';
+
     public function label(): string
     {
         return match ($this) {
@@ -44,6 +50,10 @@ enum FindingKind: string
             self::SslProblem => 'Probleme de certificat',
             self::DomainExpiring => 'Domaine bientot expire',
             self::PartialCoverage => 'Inventaire partiel',
+            self::ExposedBackup => 'Sauvegarde telechargeable',
+            self::NoBackup => 'Aucune sauvegarde',
+            self::StaleBackup => 'Sauvegarde ancienne',
+            self::TruncatedBackup => 'Sauvegarde vide',
         };
     }
 }

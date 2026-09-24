@@ -246,6 +246,37 @@ de cet outil qui détruirait des données.
 
 ---
 
+## Les sauvegardes
+
+```bash
+php bin/hspace backups
+```
+
+Deux questions, et la seconde passe devant.
+
+**Les sites sont-ils sauvegardés ?** L'outil cherche les dumps SQL, les
+archives et les dossiers que créent les greffons de sauvegarde (UpdraftPlus,
+All-in-One WP Migration, Akeeba…), avec leur taille et leur date. Une archive
+de moins d'un kilo-octet est signalée : c'est un dump interrompu, et la compter
+comme une protection est pire que de n'en avoir aucune.
+
+**Ces sauvegardes sont-elles téléchargeables ?** C'est le constat le plus grave
+que cet outil puisse faire. Un dump SQL sous une racine web se télécharge en
+devinant son nom : la base entière part — comptes, adresses, mots de passe
+hachés — sans qu'aucune faille soit nécessaire et sans laisser de trace. Sans
+sauvegarde on risque de perdre ses données ; avec une sauvegarde exposée on les
+a déjà livrées, sans le savoir.
+
+Ces constats apparaissent aussi dans le relevé et l'interface, pas seulement
+dans cette commande : les réserver à qui pense à la lancer reviendrait à ne les
+montrer qu'à ceux qui les cherchent déjà.
+
+**Ce que l'outil ne voit pas** : les sauvegardes automatiques de Hostinger ne
+sont pas sur le disque. Elles vivent dans hPanel › Fichiers › Sauvegardes, et
+un site sans archive locale peut très bien y être couvert.
+
+---
+
 ## Les commandes
 
 | Commande | Rôle |
@@ -256,6 +287,7 @@ de cet outil qui détruirait des données.
 | `sites` | Liste les sites et leurs bases |
 | `databases` | Liste toutes les bases et les sites qui les utilisent |
 | `import-databases` | Enregistre la liste des bases copiée depuis hPanel |
+| `backups` | Vérifie les sauvegardes : présence, ancienneté, exposition web |
 | `orphans` | Liste les bases qu'aucun site n'utilise |
 | `findings` | Constats du dernier relevé (`--critical`, `--warning`) |
 | `history` | Relevés enregistrés |

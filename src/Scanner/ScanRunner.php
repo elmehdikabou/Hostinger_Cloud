@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace HostingerSpace\Scanner;
 
+use HostingerSpace\Analysis\Analysis;
 use HostingerSpace\Analysis\Linker;
+use HostingerSpace\Backup\BackupAudit;
+use HostingerSpace\Backup\BackupScanner;
 use HostingerSpace\Config;
 use HostingerSpace\Model\Site;
 use HostingerSpace\Mysql\DatabaseInfo;
@@ -60,6 +63,8 @@ final class ScanRunner
         $analysis = (new Linker($this->config->int('analysis.abandoned_after_days', 180)))
             ->analyse($sites, $inventory);
 
+        $analysis = $this->auditBackups($sites, $analysis);
+
         return new ScanResult(
             startedAt: $startedAt,
             finishedAt: time(),
@@ -69,6 +74,52 @@ final class ScanRunner
             inventory: $inventory,
             analysis: $analysis,
             errors: $this->errors,
+        );
+    }
+
+    /**
+     * Ajoute les constats sur les sauvegardes a ceux de l'analyse.
+     *
+     * Ils ont leur place ici et pas seulement dans une commande dediee : c'est
+     * le releve que l'on consulte, et une sauvegarde telechargeable depuis le
+     * web est le constat le plus grave que cet outil puisse faire. La reserver
+     * a qui pense a lancer « backups » reviendrait a ne la montrer qu'a ceux
+     * qui la cherchent deja.
+     *
+     * @param array<int,Site> $sites
+     */
+    private function auditBackups(array $sites, Analysis $analysis): Analysis
+    {
+        if (!$this->config->bool('analysis.check_backups', true)) {
+            return $analysis;
+        }
+
+        ($this->report)('sauvegardes', 'Recherche des sauvegardes');
+
+        try {
+            $artifacts = (new BackupScanner($this->transport))->scan($sites);
+        } catch (\Throwable $e) {
+            // Un echec ici ne doit pas emporter tout le releve : le reste de
+            // l'inventaire garde sa valeur sans cette verification.
+            $this->errors[] = 'Recherche des sauvegardes impossible : ' . $e->getMessage();
+
+            return $analysis;
+        }
+
+        $findings = (new BackupAudit($this->config->int('analysis.stale_backup_days', 30)))
+            ->findings($artifacts, $sites);
+
+        $exposed = count(array_filter($artifacts, static fn ($a): bool => $a->webReachable));
+
+        ($this->report)('sauvegardes', count($artifacts) . ' sauvegarde(s)'
+            . ($exposed > 0 ? ", dont {$exposed} sous une racine web" : ''));
+
+        return new Analysis(
+            links: $analysis->links,
+            findings: [...$analysis->findings, ...$findings],
+            orphans: $analysis->orphans,
+            usage: $analysis->usage,
+            sitesFullyRead: $analysis->sitesFullyRead,
         );
     }
 

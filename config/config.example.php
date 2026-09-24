@@ -123,6 +123,15 @@ return [
     |--------------------------------------------------------------------------
     */
     'analysis' => [
+        // Chercher les sauvegardes sur le disque pendant le releve. Le constat
+        // qui compte est celui d'une sauvegarde telechargeable depuis le web :
+        // un dump SQL sous une racine web livre une base entiere a qui devine
+        // son nom, sans faille et sans trace.
+        'check_backups' => true,
+
+        // Au-dela, une sauvegarde est signalee comme ancienne.
+        'stale_backup_days' => 30,
+
         // Un site sans ecriture fichier ni ecriture base depuis N jours est
         // signale comme potentiellement abandonne.
         'abandoned_after_days' => 180,
